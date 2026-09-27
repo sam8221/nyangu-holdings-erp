@@ -5,6 +5,7 @@ from app.models.hr import Employee, LeaveRequest
 from app.models.inventory import StockLevel, StockMovement, Warehouse
 from app.models.organization import Branch, Company, Department, SystemSetting
 from app.models.partners import Customer, Product, ProductCategory, Supplier
+from app.models.procurement import GoodsReceipt, GoodsReceiptLine, PurchaseOrder, PurchaseOrderLine
 from app.models.rbac import Permission, Role, role_permissions, user_roles
 from app.models.sales import CustomerPayment, SalesInvoice, SalesInvoiceLine
 from app.models.system import AuditLog, DocumentSequence, Notification, PasswordResetToken
@@ -21,12 +22,16 @@ __all__ = [
     "Department",
     "DocumentSequence",
     "Employee",
+    "GoodsReceipt",
+    "GoodsReceiptLine",
     "LeaveRequest",
     "Notification",
     "PasswordResetToken",
     "Permission",
     "Product",
     "ProductCategory",
+    "PurchaseOrder",
+    "PurchaseOrderLine",
     "RefreshToken",
     "RevokedAccessToken",
     "Role",
