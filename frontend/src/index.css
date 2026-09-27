@@ -1,4 +1,27 @@
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
+  background: #f5f9fe;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.page-toolbar .spacer {
+  flex: 1;
+}
+
+.muted {
+  color: #6b7c93;
 }

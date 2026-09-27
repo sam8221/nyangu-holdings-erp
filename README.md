@@ -14,17 +14,18 @@ The backend is complete for every module below, with an automated test suite aga
 Setup, API, business rules and deployment are documented in [backend/README.md](backend/README.md),
 and every endpoint is browsable in Swagger at `/docs` once the API is running.
 
-The frontend is still a placeholder shell (login and dashboard pages only) and is the next piece
-of work.
+The frontend (React + Ant Design, white and light-blue theme) has its foundation in place:
+sign-in and password flows, the permission-aware layout, the dashboard, users and roles. See
+[frontend/README.md](frontend/README.md). The remaining module screens are next.
 
 ## Development order
 | # | Area | Backend | Frontend |
 | - | ---- | ------- | -------- |
-| 1 | Project setup | Done | Shell only |
+| 1 | Project setup | Done | Done |
 | 2 | Database | Done | — |
-| 3 | Authentication and RBAC | Done | To do |
-| 4 | Dashboard | Done | To do |
-| 5 | Users | Done | To do |
+| 3 | Authentication and RBAC | Done | Done |
+| 4 | Dashboard | Done | Done |
+| 5 | Users | Done | Done (users and roles) |
 | 6 | Employees | Done | To do |
 | 7 | Customers and suppliers | Done | To do |
 | 8 | Products and inventory | Done | To do |
@@ -34,7 +35,7 @@ of work.
 | 12 | Assets | Done | To do |
 | 13 | Reports | Done | To do |
 | 14 | Notifications and audit logs | Done | To do |
-| 15 | Testing | Backend suite done | To do |
+| 15 | Testing | Backend suite done | Foundation tests done |
 | 16 | Deployment | Docker, nginx and checklist done | — |
 
 ## Repository layout
