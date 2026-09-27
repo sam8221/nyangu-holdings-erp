@@ -1,0 +1,13 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# Pydantic generics keep the Generic[T] form for readability.
+ignore = ["UP046"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/conftest.py" = ["E402"]
+"migrations/versions/*" = ["E501", "W291"]

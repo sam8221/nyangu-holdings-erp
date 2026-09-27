@@ -1,0 +1,2 @@
+-- Nyangu Holdings ERP database
+-- Initial schema will be created through SQLAlchemy/Alembic.

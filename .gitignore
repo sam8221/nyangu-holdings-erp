@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# IDE
+.vscode/
+.idea/
+
+# Database/backups
+*.sql.bak
+database/backups/*
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/

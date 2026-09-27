@@ -1,0 +1,38 @@
+# Usage (from this folder):
+#   POSTGRES_PASSWORD=... SECRET_KEY=... docker compose up --build
+#   docker compose exec backend alembic upgrade head
+#   docker compose exec backend python -m app.seed.run
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: nyangu_erp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.backend
+    depends_on:
+      - db
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD}@db:5432/nyangu_erp
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY to a random value of at least 32 characters}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.frontend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:

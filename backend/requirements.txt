@@ -1,0 +1,15 @@
+# Runtime
+fastapi>=0.141,<1
+uvicorn[standard]>=0.54
+sqlalchemy>=2.1,<2.2
+psycopg[binary]>=3.3,<4
+alembic>=1.20,<2
+pydantic[email]>=2.13,<3
+pydantic-settings>=2.15,<3
+pyjwt>=2.15,<3
+argon2-cffi>=25.1
+
+# Tests and tooling
+pytest>=9.1
+httpx2>=2.13
+ruff>=0.16
