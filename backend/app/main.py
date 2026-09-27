@@ -21,6 +21,7 @@ from app.middleware.request_context import (
 )
 from app.routers import (
     auth,
+    finance,
     health,
     hr,
     inventory,
@@ -59,6 +60,8 @@ ROUTERS = [
     inventory.inventory_router,
     sales.router,
     procurement.router,
+    finance.expense_categories_router,
+    finance.router,
 ]
 
 _HTTP_ERROR_CODES = {

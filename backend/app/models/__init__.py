@@ -1,6 +1,7 @@
 """Import every model here so Alembic autogenerate and relationship resolution can see them."""
 
 from app.models.base import Base
+from app.models.finance import Expense, ExpenseCategory, SupplierBill, SupplierPayment
 from app.models.hr import Employee, LeaveRequest
 from app.models.inventory import StockLevel, StockMovement, Warehouse
 from app.models.organization import Branch, Company, Department, SystemSetting
@@ -22,6 +23,8 @@ __all__ = [
     "Department",
     "DocumentSequence",
     "Employee",
+    "Expense",
+    "ExpenseCategory",
     "GoodsReceipt",
     "GoodsReceiptLine",
     "LeaveRequest",
@@ -38,6 +41,8 @@ __all__ = [
     "SalesInvoice",
     "SalesInvoiceLine",
     "Supplier",
+    "SupplierBill",
+    "SupplierPayment",
     "StockLevel",
     "StockMovement",
     "SystemSetting",
