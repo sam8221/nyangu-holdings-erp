@@ -20,6 +20,7 @@ from app.middleware.request_context import (
     SecurityHeadersMiddleware,
 )
 from app.routers import (
+    assets,
     auth,
     finance,
     health,
@@ -62,6 +63,9 @@ ROUTERS = [
     procurement.router,
     finance.expense_categories_router,
     finance.router,
+    assets.asset_categories_router,
+    assets.assets_router,
+    assets.asset_actions_router,
 ]
 
 _HTTP_ERROR_CODES = {

@@ -1,5 +1,6 @@
 """Import every model here so Alembic autogenerate and relationship resolution can see them."""
 
+from app.models.assets import Asset, AssetCategory
 from app.models.base import Base
 from app.models.finance import Expense, ExpenseCategory, SupplierBill, SupplierPayment
 from app.models.hr import Employee, LeaveRequest
@@ -14,6 +15,8 @@ from app.models.token import RefreshToken, RevokedAccessToken
 from app.models.user import User, UserStatus
 
 __all__ = [
+    "Asset",
+    "AssetCategory",
     "AuditLog",
     "Base",
     "Branch",
