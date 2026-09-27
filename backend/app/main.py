@@ -19,7 +19,7 @@ from app.middleware.request_context import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.routers import auth, health, roles, system, users
+from app.routers import auth, health, hr, organization, roles, system, users
 from app.utils.exceptions import AppError
 from app.utils.logging import configure_logging
 
@@ -33,6 +33,12 @@ ROUTERS = [
     roles.permissions_router,
     system.audit_router,
     system.notifications_router,
+    organization.company_router,
+    organization.branches_router,
+    organization.departments_router,
+    organization.settings_router,
+    hr.employees_router,
+    hr.leave_router,
 ]
 
 _HTTP_ERROR_CODES = {

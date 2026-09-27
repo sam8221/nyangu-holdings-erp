@@ -69,3 +69,14 @@ def clean_text(value: str) -> str:
     if not value:
         raise ValueError("Must not be blank")
     return value
+
+
+CODE_RE = re.compile(r"^[A-Z0-9][A-Z0-9_-]{0,19}$")
+
+
+def normalize_code(value: str) -> str:
+    """Short reference codes (branches, warehouses, SKUs...): upper case, no spaces."""
+    value = value.strip().upper()
+    if not CODE_RE.match(value):
+        raise ValueError("Code must be 1-20 characters: letters, digits, '-' or '_'")
+    return value

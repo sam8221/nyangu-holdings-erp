@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.permissions import PERMISSION_DESCRIPTIONS, SYSTEM_ROLES, Perm
-from app.models import Permission, Role
+from app.config import get_settings
+from app.models import Company, Permission, Role
 from app.repositories.role_repository import PermissionRepository, RoleRepository
 
 logger = logging.getLogger(__name__)
@@ -19,6 +21,7 @@ class CatalogResult:
     permissions_created: int = 0
     permissions_updated: int = 0
     roles_created: int = 0
+    company_created: bool = False
 
 
 def seed_catalog(db: Session) -> CatalogResult:
@@ -62,4 +65,17 @@ def seed_catalog(db: Session) -> CatalogResult:
         )
         result.roles_created += 1
     db.flush()
+
+    if db.scalars(select(Company).limit(1)).first() is None:
+        settings = get_settings()
+        db.add(
+            Company(
+                name="Nyangu Holdings",
+                country="Zambia",
+                currency=settings.DEFAULT_CURRENCY,
+                fiscal_year_start_month=1,
+            )
+        )
+        result.company_created = True
+        db.flush()
     return result

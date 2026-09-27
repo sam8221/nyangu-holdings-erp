@@ -99,6 +99,7 @@ def main() -> None:
         print(
             f"Permissions: {result.permissions_created} created, "
             f"{result.permissions_updated} updated. System roles: {result.roles_created} created."
+            + (" Company profile created." if result.company_created else "")
         )
         if settings.SEED_ADMIN_EMAIL:
             user, created = seed_admin(db, settings.SEED_ADMIN_EMAIL, settings.SEED_ADMIN_PASSWORD)
