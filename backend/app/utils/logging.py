@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import sys
 from contextvars import ContextVar
 
 request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
+client_ip_ctx: ContextVar[str | None] = ContextVar("client_ip", default=None)
+user_agent_ctx: ContextVar[str | None] = ContextVar("user_agent", default=None)
 
 _SENSITIVE_KEYS = (
     r"(?:password|passwd|pwd|secret|token|access_token|refresh_token|api_key|authorization)"
@@ -52,14 +55,33 @@ class RequestIdFilter(logging.Filter):
         return True
 
 
-def configure_logging(level: str = "INFO") -> None:
+class JsonFormatter(logging.Formatter):
+    """One JSON object per line, for log shippers."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "time": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+            "level": record.levelname,
+            "logger": record.name,
+            "request_id": getattr(record, "request_id", "-"),
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
+
+
+def configure_logging(level: str = "INFO", fmt: str = "text") -> None:
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s %(levelname)-8s [%(request_id)s] %(name)s: %(message)s",
-            datefmt="%Y-%m-%dT%H:%M:%S%z",
+    if fmt == "json":
+        handler.setFormatter(JsonFormatter())
+    else:
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(levelname)-8s [%(request_id)s] %(name)s: %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S%z",
+            )
         )
-    )
     handler.addFilter(RequestIdFilter())
     handler.addFilter(SensitiveDataFilter())
 

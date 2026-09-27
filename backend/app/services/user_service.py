@@ -18,6 +18,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.common import Page, PageParams
 from app.schemas.user import UserCreate, UserUpdate
 from app.services import presenters
+from app.services.audit import AuditService, diff, snapshot
 from app.services.auth_service import revoke_all_sessions
 from app.utils.exceptions import (
     BadRequestError,
@@ -30,12 +31,15 @@ from app.utils.time import utcnow
 
 logger = logging.getLogger(__name__)
 
+_AUDITED_FIELDS = ("full_name", "username", "email", "phone", "status")
+
 
 class UserService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.users = UserRepository(db)
         self.roles = RoleRepository(db)
+        self.audit = AuditService(db)
 
     # ------------------------------------------------------------------ guards
     def _get_or_404(self, user_id: uuid.UUID, *, for_update: bool = False) -> User:
@@ -135,6 +139,17 @@ class UserService:
         )
         if roles:
             self.users.replace_roles(user, [r.id for r in roles], ctx.user.id)
+        self.audit.log(
+            "users.create",
+            actor=ctx.user,
+            entity_type="user",
+            entity_id=user.id,
+            summary=f"Created user {user.username}",
+            changes={
+                **snapshot(user, _AUDITED_FIELDS),
+                "roles": sorted(r.name for r in roles),
+            },
+        )
         self.db.commit()
         self.db.refresh(user)
         logger.info("User %s created by %s", user.id, ctx.user.id)
@@ -150,8 +165,19 @@ class UserService:
         self._check_unique(
             email=changes.get("email"), username=changes.get("username"), exclude_id=user.id
         )
+        before = snapshot(user, _AUDITED_FIELDS)
         for key, value in changes.items():
             setattr(user, key, value)
+        delta = diff(before, snapshot(user, _AUDITED_FIELDS))
+        if delta:
+            self.audit.log(
+                "users.update",
+                actor=ctx.user,
+                entity_type="user",
+                entity_id=user.id,
+                summary=f"Updated user {user.username}",
+                changes=delta,
+            )
         self.db.commit()
         self.db.refresh(user)
         return presenters.user_detail(user)
@@ -162,6 +188,7 @@ class UserService:
             raise BusinessRuleError("You cannot change the status of your own account")
         self._guard_super_admin_target(ctx, user)
 
+        previous = user.status
         if status == UserStatus.INACTIVE and user.is_active:
             self._guard_last_super_admin(user)
             user.status = UserStatus.INACTIVE
@@ -170,6 +197,15 @@ class UserService:
             user.status = UserStatus.ACTIVE
             user.failed_login_attempts = 0
             user.locked_until = None
+        if previous != user.status:
+            self.audit.log(
+                "users.deactivate" if user.status == UserStatus.INACTIVE else "users.activate",
+                actor=ctx.user,
+                entity_type="user",
+                entity_id=user.id,
+                summary=f"User {user.username} set to {user.status}",
+                changes={"status": {"from": previous, "to": user.status}},
+            )
         self.db.commit()
         self.db.refresh(user)
         logger.info("User %s set to %s by %s", user.id, status, ctx.user.id)
@@ -191,7 +227,18 @@ class UserService:
         if SUPER_ADMIN in user.role_names and all(r.name != SUPER_ADMIN for r in new_roles):
             self._guard_last_super_admin(user)
 
+        previous_names = sorted(user.role_names)
         self.users.replace_roles(user, [r.id for r in new_roles], ctx.user.id)
+        new_names = sorted(r.name for r in new_roles)
+        if previous_names != new_names:
+            self.audit.log(
+                "users.roles",
+                actor=ctx.user,
+                entity_type="user",
+                entity_id=user.id,
+                summary=f"Roles of {user.username} changed",
+                changes={"roles": {"from": previous_names, "to": new_names}},
+            )
         self.db.commit()
         self.db.refresh(user)
         logger.info("Roles of user %s replaced by %s", user.id, ctx.user.id)
@@ -208,5 +255,12 @@ class UserService:
         user.failed_login_attempts = 0
         user.locked_until = None
         revoke_all_sessions(self.db, user)
+        self.audit.log(
+            "users.reset_password",
+            actor=ctx.user,
+            entity_type="user",
+            entity_id=user.id,
+            summary=f"Password of {user.username} reset by an administrator",
+        )
         self.db.commit()
         logger.info("Password of user %s reset by %s", user.id, ctx.user.id)

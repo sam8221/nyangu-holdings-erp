@@ -14,6 +14,7 @@ from app.models import Permission, Role
 from app.repositories.role_repository import PermissionRepository, RoleRepository
 from app.schemas.rbac import RoleCreate, RoleUpdate
 from app.services import presenters
+from app.services.audit import AuditService, diff, snapshot
 from app.utils.exceptions import (
     BadRequestError,
     BusinessRuleError,
@@ -24,12 +25,15 @@ from app.utils.exceptions import (
 
 logger = logging.getLogger(__name__)
 
+_AUDITED_FIELDS = ("name", "display_name", "description", "is_active")
+
 
 class RoleService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.roles = RoleRepository(db)
         self.permissions = PermissionRepository(db)
+        self.audit = AuditService(db)
 
     def _get_or_404(self, role_id: uuid.UUID) -> Role:
         role = self.roles.get(role_id)
@@ -92,6 +96,17 @@ class RoleService:
                 permissions=perms,
             )
         )
+        self.audit.log(
+            "roles.create",
+            actor=ctx.user,
+            entity_type="role",
+            entity_id=role.id,
+            summary=f"Created role {role.name}",
+            changes={
+                **snapshot(role, _AUDITED_FIELDS),
+                "permissions": sorted(p.code for p in perms),
+            },
+        )
         self.db.commit()
         self.db.refresh(role)
         logger.info("Role %s created by %s", role.name, ctx.user.id)
@@ -103,6 +118,10 @@ class RoleService:
             raise BusinessRuleError("The SUPER_ADMIN role cannot be edited")
 
         changes = data.model_dump(exclude_unset=True)
+        before = {
+            **snapshot(role, _AUDITED_FIELDS),
+            "permissions": sorted(role.permission_codes),
+        }
         if "name" in changes and changes["name"] != role.name:
             if role.is_system:
                 raise BusinessRuleError("System roles cannot be renamed")
@@ -128,6 +147,20 @@ class RoleService:
             self._guard_grant(ctx, added)
             role.permissions = perms
 
+        after = {
+            **snapshot(role, _AUDITED_FIELDS),
+            "permissions": sorted(p.code for p in role.permissions),
+        }
+        delta = diff(before, after)
+        if delta:
+            self.audit.log(
+                "roles.update",
+                actor=ctx.user,
+                entity_type="role",
+                entity_id=role.id,
+                summary=f"Updated role {role.name}",
+                changes=delta,
+            )
         self.db.commit()
         self.db.refresh(role)
         logger.info("Role %s updated by %s", role.name, ctx.user.id)
@@ -142,6 +175,14 @@ class RoleService:
             raise BusinessRuleError(
                 f"This role is assigned to {count} user(s). Remove it from them before deleting."
             )
+        self.audit.log(
+            "roles.delete",
+            actor=ctx.user,
+            entity_type="role",
+            entity_id=role.id,
+            summary=f"Deleted role {role.name}",
+            changes=snapshot(role, _AUDITED_FIELDS),
+        )
         self.roles.delete(role)
         self.db.commit()
         logger.info("Role %s deleted by %s", role.name, ctx.user.id)

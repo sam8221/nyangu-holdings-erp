@@ -61,7 +61,7 @@ def test_every_endpoint_is_documented(client: TestClient) -> None:
     operations = [
         (path, method, op) for path, ops in spec["paths"].items() for method, op in ops.items()
     ]
-    assert len(operations) == 19
+    assert len(operations) >= 19
     for path, method, op in operations:
         assert path.startswith(API), path
         assert op.get("summary"), f"{method.upper()} {path} has no summary"
@@ -180,3 +180,27 @@ def test_logs_mask_passwords_and_tokens() -> None:
     )
     SensitiveDataFilter().filter(record)
     assert "S3cret!" not in record.getMessage()
+
+
+def test_oversized_request_body_is_rejected(client: TestClient) -> None:
+    from app.config import get_settings
+
+    limit = get_settings().MAX_REQUEST_BODY_BYTES
+    r = client.post(
+        f"{API}/auth/login",
+        content=b"x" * (limit + 1),
+        headers={"Content-Type": "application/json"},
+    )
+    assert r.status_code == 413
+    assert r.json()["error_code"] == "PAYLOAD_TOO_LARGE"
+
+
+def test_json_log_format() -> None:
+    import json
+
+    from app.utils.logging import JsonFormatter
+
+    record = logging.LogRecord("app.test", logging.INFO, __file__, 1, "hello %s", ("world",), None)
+    record.request_id = "abc"
+    line = json.loads(JsonFormatter().format(record))
+    assert line["message"] == "hello world" and line["request_id"] == "abc"

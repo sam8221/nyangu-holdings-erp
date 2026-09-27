@@ -11,7 +11,7 @@ import uuid
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.utils.logging import request_id_ctx
+from app.utils.logging import client_ip_ctx, request_id_ctx, user_agent_ctx
 
 logger = logging.getLogger("app.request")
 
@@ -35,6 +35,12 @@ class RequestContextMiddleware:
         )
         request_id = incoming if _VALID_REQUEST_ID.match(incoming) else uuid.uuid4().hex
         token = request_id_ctx.set(request_id)
+        client = scope.get("client")
+        ip_token = client_ip_ctx.set(client[0] if client else None)
+        user_agent = next(
+            (v.decode("latin-1") for k, v in scope["headers"] if k == b"user-agent"), None
+        )
+        ua_token = user_agent_ctx.set(user_agent[:255] if user_agent else None)
         scope.setdefault("state", {})["request_id"] = request_id
 
         start = time.perf_counter()
@@ -82,6 +88,8 @@ class RequestContextMiddleware:
                 duration_ms,
             )
             request_id_ctx.reset(token)
+            client_ip_ctx.reset(ip_token)
+            user_agent_ctx.reset(ua_token)
 
 
 _DOCS_PATHS = ("/docs", "/redoc")
@@ -125,3 +133,71 @@ class SecurityHeadersMiddleware:
             await send(message)
 
         await self.app(scope, receive, send_wrapper)
+
+
+class _BodyTooLarge(Exception):
+    pass
+
+
+class BodySizeLimitMiddleware:
+    """Reject request bodies larger than ``max_bytes`` with 413, before they reach a handler."""
+
+    def __init__(self, app: ASGIApp, *, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        declared = next((v for k, v in scope["headers"] if k == b"content-length"), None)
+        if declared is not None and declared.isdigit() and int(declared) > self.max_bytes:
+            await self._reject(send)
+            return
+
+        received = 0
+        started = False
+
+        async def limited_receive() -> Message:
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    raise _BodyTooLarge
+            return message
+
+        async def tracking_send(message: Message) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, limited_receive, tracking_send)
+        except _BodyTooLarge:
+            if started:
+                raise
+            await self._reject(send)
+
+    async def _reject(self, send: Send) -> None:
+        body = json.dumps(
+            {
+                "success": False,
+                "message": f"Request body is too large (limit {self.max_bytes} bytes)",
+                "error_code": "PAYLOAD_TOO_LARGE",
+                "errors": None,
+            }
+        ).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})

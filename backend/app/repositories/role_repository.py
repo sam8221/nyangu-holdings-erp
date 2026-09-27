@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Permission, Role, user_roles
-from app.repositories.user_repository import like_pattern
+from app.repositories.query import like_pattern
 
 
 class RoleRepository:

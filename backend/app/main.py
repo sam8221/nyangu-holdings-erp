@@ -15,14 +15,25 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import get_settings
 from app.middleware.request_context import (
     REQUEST_ID_HEADER,
+    BodySizeLimitMiddleware,
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.routers import auth, health, roles, users
+from app.routers import auth, health, roles, system, users
 from app.utils.exceptions import AppError
 from app.utils.logging import configure_logging
 
 logger = logging.getLogger("app")
+
+ROUTERS = [
+    health.router,
+    auth.router,
+    users.router,
+    roles.roles_router,
+    roles.permissions_router,
+    system.audit_router,
+    system.notifications_router,
+]
 
 _HTTP_ERROR_CODES = {
     400: "BAD_REQUEST",
@@ -111,20 +122,23 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    configure_logging(settings.LOG_LEVEL)
+    configure_logging(settings.LOG_LEVEL, settings.LOG_FORMAT)
 
+    docs = settings.DOCS_ENABLED
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
         description=(
             "REST API for the Nyangu Holdings ERP (Zambia, ZMW, Africa/Lusaka).\n\n"
             "Log in with `POST /api/v1/auth/login`, then click **Authorize** and paste the "
-            "`access_token`."
+            "`access_token`.\n\n"
+            'Money amounts and quantities are decimals serialised as strings (e.g. `"1500.00"`) '
+            "so no precision is lost."
         ),
         debug=settings.DEBUG,
-        openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
-        docs_url="/docs",
-        redoc_url="/redoc",
+        openapi_url=f"{settings.API_V1_PREFIX}/openapi.json" if docs else None,
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
     )
 
     # Middleware added last runs first (outermost).
@@ -137,24 +151,22 @@ def create_app() -> FastAPI:
         expose_headers=[REQUEST_ID_HEADER, "Retry-After"],
         max_age=600,
     )
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.MAX_REQUEST_BODY_BYTES)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.ENVIRONMENT == "production")
 
     register_exception_handlers(app)
 
     prefix = settings.API_V1_PREFIX
-    app.include_router(health.router, prefix=prefix)
-    app.include_router(auth.router, prefix=prefix)
-    app.include_router(users.router, prefix=prefix)
-    app.include_router(roles.roles_router, prefix=prefix)
-    app.include_router(roles.permissions_router, prefix=prefix)
+    for router in ROUTERS:
+        app.include_router(router, prefix=prefix)
 
     @app.get("/", include_in_schema=False)
     def root() -> dict[str, Any]:
         return {
             "success": True,
             "message": f"{settings.APP_NAME} API",
-            "data": {"docs": "/docs", "health": f"{prefix}/health"},
+            "data": {"docs": "/docs" if docs else None, "health": f"{prefix}/health"},
         }
 
     return app

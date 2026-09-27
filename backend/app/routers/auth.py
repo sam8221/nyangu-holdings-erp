@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from app.auth.dependencies import CurrentAuth, DbSession
-from app.middleware.rate_limit import client_ip, enforce_login_rate_limit
+from app.middleware.rate_limit import (
+    client_ip,
+    enforce_login_rate_limit,
+    enforce_password_reset_rate_limit,
+)
 from app.schemas.auth import (
     ChangePasswordRequest,
     CurrentUser,
@@ -16,10 +20,47 @@ from app.schemas.auth import (
     TokenPair,
 )
 from app.schemas.common import ApiResponse, error_responses, ok
+from app.schemas.system import ForgotPasswordRequest, ResetPasswordRequest
 from app.services import presenters
-from app.services.auth_service import AuthService
+from app.services.auth_service import RESET_REQUESTED, AuthService
+from app.services.email import send_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.post(
+    "/forgot-password",
+    summary="Email a password reset link",
+    description="Always returns the same response, whether or not the address has an account. "
+    "The link expires after PASSWORD_RESET_EXPIRE_MINUTES and works once.",
+    response_model=ApiResponse[None],
+    responses=error_responses(422, 429),
+    dependencies=[Depends(enforce_password_reset_rate_limit)],
+)
+def forgot_password(
+    body: ForgotPasswordRequest,
+    request: Request,
+    background: BackgroundTasks,
+    db: DbSession,
+) -> dict:
+    message = AuthService(db).request_password_reset(body.email, ip=client_ip(request))
+    if message is not None:
+        # Sent after the response so delivery time cannot reveal whether the account exists.
+        background.add_task(send_email, message)
+    return ok(None, RESET_REQUESTED)
+
+
+@router.post(
+    "/reset-password",
+    summary="Set a new password using an emailed reset token",
+    description="Ends every existing session of the account.",
+    response_model=ApiResponse[None],
+    responses=error_responses(400, 422, 429),
+    dependencies=[Depends(enforce_password_reset_rate_limit)],
+)
+def reset_password(body: ResetPasswordRequest, db: DbSession) -> dict:
+    AuthService(db).reset_password(body.token, body.new_password)
+    return ok(None, "Password has been reset. You can now log in with the new password.")
 
 
 def _ua(request: Request) -> str | None:

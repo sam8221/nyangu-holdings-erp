@@ -21,3 +21,6 @@ database/backups/*
 # Tooling caches
 .pytest_cache/
 .ruff_cache/
+
+# Local runtime files (development email outbox, etc.)
+backend/var/

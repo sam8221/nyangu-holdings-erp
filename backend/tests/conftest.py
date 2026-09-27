@@ -43,6 +43,8 @@ os.environ["DEBUG"] = "false"
 os.environ["SECRET_KEY"] = "test-secret-key-that-is-long-enough-0123456789abcdef"
 os.environ["CORS_ORIGINS"] = "http://localhost:5173"
 os.environ["LOG_LEVEL"] = "WARNING"
+os.environ["EMAIL_BACKEND"] = "memory"
+os.environ["FRONTEND_URL"] = "https://erp.example.com"
 
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
@@ -52,10 +54,11 @@ from sqlalchemy.orm import Session  # noqa: E402
 from app.auth.hashing import hash_password  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
-from app.middleware.rate_limit import login_rate_limiter  # noqa: E402
+from app.middleware.rate_limit import login_rate_limiter, password_reset_rate_limiter  # noqa: E402
 from app.models import Base, Role, User, UserStatus  # noqa: E402
 from app.repositories.user_repository import UserRepository  # noqa: E402
 from app.seed.catalog import seed_catalog  # noqa: E402
+from app.services.email import memory_outbox  # noqa: E402
 
 API = "/api/v1"
 DEFAULT_PASSWORD = "Str0ng!Passw0rd"
@@ -88,6 +91,8 @@ def _clean_state() -> Iterator[None]:
         seed_catalog(db)
         db.commit()
     login_rate_limiter.reset()
+    password_reset_rate_limiter.reset()
+    memory_outbox().clear()
     yield
 
 

@@ -92,3 +92,26 @@ def require_permissions(*perms: Perm | str) -> Callable[..., AuthContext]:
 
     checker.__name__ = f"require_{'_'.join(c.replace('.', '_') for c in codes) or 'auth'}"
     return checker
+
+
+def require_any_permission(*perms: Perm | str) -> Callable[..., AuthContext]:
+    """Dependency factory: the caller must hold *at least one* of the given permissions."""
+    codes = tuple(str(p) for p in perms)
+
+    def checker(ctx: CurrentAuth) -> AuthContext:
+        if not (ctx.is_super_admin or any(c in ctx.permissions for c in codes)):
+            raise ForbiddenError()
+        return ctx
+
+    checker.__name__ = f"require_any_{'_'.join(c.replace('.', '_') for c in codes)}"
+    return checker
+
+
+def auth_with(*perms: Perm | str) -> type[AuthContext]:
+    """Shorthand for an ``AuthContext`` parameter that requires all ``perms``."""
+    return Annotated[AuthContext, Depends(require_permissions(*perms))]  # type: ignore[return-value]
+
+
+def auth_with_any(*perms: Perm | str) -> type[AuthContext]:
+    """Shorthand for an ``AuthContext`` parameter that requires any one of ``perms``."""
+    return Annotated[AuthContext, Depends(require_any_permission(*perms))]  # type: ignore[return-value]

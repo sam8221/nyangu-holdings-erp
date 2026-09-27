@@ -9,13 +9,8 @@ from sqlalchemy import Select, and_, delete, func, insert, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Role, User, UserStatus, user_roles
+from app.repositories.query import like_pattern
 from app.schemas.common import PageParams
-
-
-def like_pattern(search: str) -> str:
-    """Lower-cased LIKE pattern with %, _ and backslash escaped so they match literally."""
-    escaped = search.lower().replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
-    return f"%{escaped}%"
 
 
 class UserRepository:

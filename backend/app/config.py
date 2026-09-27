@@ -53,8 +53,31 @@ class Settings(BaseSettings):
     ACCOUNT_LOCKOUT_MINUTES: int = Field(default=15, ge=1)
     LOGIN_RATE_LIMIT_PER_MINUTE: int = Field(default=10, ge=1)
 
+    # --- Password reset ---
+    PASSWORD_RESET_EXPIRE_MINUTES: int = Field(default=30, ge=5, le=24 * 60)
+    PASSWORD_RESET_RATE_LIMIT_PER_HOUR: int = Field(default=5, ge=1)
+
     # --- HTTP ---
     CORS_ORIGINS: str = "http://localhost:5173"
+    FRONTEND_URL: str = "http://localhost:5173"
+    MAX_REQUEST_BODY_BYTES: int = Field(default=2 * 1024 * 1024, ge=1024)
+    DOCS_ENABLED: bool = True
+
+    # --- Logging ---
+    LOG_FORMAT: Literal["text", "json"] = "text"
+
+    # --- Email ---
+    # file: writes .eml files to EMAIL_FILE_DIR (development); smtp: real delivery;
+    # console: logs a one-line summary only; memory: kept in-process (tests).
+    EMAIL_BACKEND: Literal["file", "smtp", "console", "memory"] = "file"
+    EMAIL_FROM: str = "Nyangu Holdings ERP <no-reply@nyanguholdings.com>"
+    EMAIL_FILE_DIR: str = "var/outbox"
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_USE_TLS: bool = True
+    SMTP_TIMEOUT_SECONDS: int = Field(default=10, ge=1, le=120)
 
     # --- Localisation ---
     DEFAULT_CURRENCY: str = "ZMW"
@@ -82,6 +105,8 @@ class Settings(BaseSettings):
                 )
         if self.is_production_like and self.DEBUG:
             raise ValueError(f"DEBUG must be false when ENVIRONMENT={self.ENVIRONMENT}")
+        if self.EMAIL_BACKEND == "smtp" and not self.SMTP_HOST:
+            raise ValueError("SMTP_HOST is required when EMAIL_BACKEND=smtp")
         return self
 
 

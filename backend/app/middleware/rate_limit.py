@@ -62,3 +62,17 @@ def enforce_login_rate_limit(request: Request) -> None:
             "Too many login attempts. Please try again later.",
             headers={"Retry-After": str(retry_after)},
         )
+
+
+password_reset_rate_limiter = RateLimiter(
+    limit=get_settings().PASSWORD_RESET_RATE_LIMIT_PER_HOUR, window_seconds=3600
+)
+
+
+def enforce_password_reset_rate_limit(request: Request) -> None:
+    allowed, retry_after = password_reset_rate_limiter.hit(f"reset:{client_ip(request)}")
+    if not allowed:
+        raise RateLimitedError(
+            "Too many password reset requests. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
