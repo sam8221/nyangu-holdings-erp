@@ -19,7 +19,17 @@ from app.middleware.request_context import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.routers import auth, health, hr, organization, roles, system, users
+from app.routers import (
+    auth,
+    health,
+    hr,
+    inventory,
+    organization,
+    partners,
+    roles,
+    system,
+    users,
+)
 from app.utils.exceptions import AppError
 from app.utils.logging import configure_logging
 
@@ -39,6 +49,12 @@ ROUTERS = [
     organization.settings_router,
     hr.employees_router,
     hr.leave_router,
+    partners.customers_router,
+    partners.suppliers_router,
+    partners.categories_router,
+    partners.products_router,
+    inventory.warehouses_router,
+    inventory.inventory_router,
 ]
 
 _HTTP_ERROR_CODES = {

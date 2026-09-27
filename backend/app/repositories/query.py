@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from sqlalchemy import ColumnElement, Select, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, lazyload
 
 from app.schemas.common import PageParams
 from app.utils.exceptions import BadRequestError, NotFoundError
@@ -32,8 +32,11 @@ def get_or_404[M](db: Session, model: type[M], obj_id: uuid.UUID | str, label: s
 
 
 def get_for_update_or_404[M](db: Session, model: type[M], obj_id: uuid.UUID, label: str) -> M:
+    # Relationships load lazily here: eager-loaded related rows would otherwise be refreshed by
+    # populate_existing, discarding unsaved changes made to them earlier in the request.
     stmt = (
         select(model)
+        .options(lazyload("*"))
         .where(model.id == obj_id)  # type: ignore[attr-defined]
         .with_for_update(of=model)
         .execution_options(populate_existing=True)

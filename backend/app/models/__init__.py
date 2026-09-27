@@ -2,7 +2,9 @@
 
 from app.models.base import Base
 from app.models.hr import Employee, LeaveRequest
+from app.models.inventory import StockLevel, StockMovement, Warehouse
 from app.models.organization import Branch, Company, Department, SystemSetting
+from app.models.partners import Customer, Product, ProductCategory, Supplier
 from app.models.rbac import Permission, Role, role_permissions, user_roles
 from app.models.system import AuditLog, DocumentSequence, Notification, PasswordResetToken
 from app.models.token import RefreshToken, RevokedAccessToken
@@ -13,6 +15,7 @@ __all__ = [
     "Base",
     "Branch",
     "Company",
+    "Customer",
     "Department",
     "DocumentSequence",
     "Employee",
@@ -20,12 +23,18 @@ __all__ = [
     "Notification",
     "PasswordResetToken",
     "Permission",
+    "Product",
+    "ProductCategory",
     "RefreshToken",
     "RevokedAccessToken",
     "Role",
+    "Supplier",
+    "StockLevel",
+    "StockMovement",
     "SystemSetting",
     "User",
     "UserStatus",
+    "Warehouse",
     "role_permissions",
     "user_roles",
 ]
