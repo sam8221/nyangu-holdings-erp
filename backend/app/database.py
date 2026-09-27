@@ -9,11 +9,13 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
 
+_settings = get_settings()
 engine = create_engine(
-    get_settings().DATABASE_URL,
+    _settings.DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=_settings.DB_POOL_SIZE,
+    max_overflow=_settings.DB_MAX_OVERFLOW,
+    pool_recycle=1800,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

@@ -1,4 +1,5 @@
-# Runtime
+# Runtime dependencies (installed in the production image).
+# For development and tests use requirements-dev.txt.
 fastapi>=0.141,<1
 uvicorn[standard]>=0.54
 sqlalchemy>=2.1,<2.2
@@ -10,8 +11,3 @@ pyjwt>=2.15,<3
 argon2-cffi>=25.1
 reportlab>=4.2
 openpyxl>=3.1
-
-# Tests and tooling
-pytest>=9.1
-httpx2>=2.13
-ruff>=0.16

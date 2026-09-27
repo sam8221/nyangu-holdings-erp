@@ -29,6 +29,7 @@ from app.routers import (
     organization,
     partners,
     procurement,
+    reports,
     roles,
     sales,
     system,
@@ -66,6 +67,8 @@ ROUTERS = [
     assets.asset_categories_router,
     assets.assets_router,
     assets.asset_actions_router,
+    reports.dashboard_router,
+    reports.reports_router,
 ]
 
 _HTTP_ERROR_CODES = {

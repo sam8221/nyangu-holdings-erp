@@ -151,7 +151,11 @@ def test_unhandled_error_returns_safe_500() -> None:
 
 
 def _settings(**overrides) -> Settings:
-    base = {"DATABASE_URL": "postgresql+psycopg://u:p@localhost/db", "_env_file": None}
+    base = {
+        "DATABASE_URL": "postgresql+psycopg://u:p@localhost/db",
+        "EMAIL_BACKEND": "console",
+        "_env_file": None,
+    }
     return Settings(**{**base, **overrides})  # type: ignore[arg-type]
 
 

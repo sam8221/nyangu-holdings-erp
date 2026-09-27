@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Tests and tooling
+pytest>=9.1
+httpx2>=2.13
+ruff>=0.16

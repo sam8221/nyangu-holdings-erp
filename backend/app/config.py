@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     # --- Database ---
     DATABASE_URL: str
     TEST_DATABASE_URL: str | None = None
+    DB_POOL_SIZE: int = Field(default=10, ge=1, le=100)
+    DB_MAX_OVERFLOW: int = Field(default=20, ge=0, le=200)
 
     # --- Security / JWT ---
     SECRET_KEY: str
@@ -105,6 +107,10 @@ class Settings(BaseSettings):
                 )
         if self.is_production_like and self.DEBUG:
             raise ValueError(f"DEBUG must be false when ENVIRONMENT={self.ENVIRONMENT}")
+        if self.is_production_like and "*" in self.cors_origins_list:
+            raise ValueError("CORS_ORIGINS cannot be '*' outside development")
+        if self.is_production_like and self.EMAIL_BACKEND == "memory":
+            raise ValueError("EMAIL_BACKEND=memory is for tests only")
         if self.EMAIL_BACKEND == "smtp" and not self.SMTP_HOST:
             raise ValueError("SMTP_HOST is required when EMAIL_BACKEND=smtp")
         return self

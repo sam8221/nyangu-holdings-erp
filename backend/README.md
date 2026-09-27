@@ -3,8 +3,9 @@
 REST API backend for the Nyangu Holdings Enterprise Resource Planning system (Zambia · ZMW · Africa/Lusaka).
 Built with **FastAPI**, **PostgreSQL**, **SQLAlchemy 2.x**, **Alembic** and **Pydantic v2**, designed to be consumed by a React frontend.
 
-> **Current status: Phase 1 complete.** Covers configuration, database, migrations, users, roles, permissions,
-> JWT authentication and RBAC. Business modules (HR, sales, inventory, procurement, finance, …) are added phase by phase.
+> **Current status: backend phases 1–10 complete.** Authentication and RBAC, users, audit log,
+> notifications, company and HR, customers, suppliers, products, inventory, sales, procurement,
+> finance, fixed assets, dashboard, reports and production hardening. The React frontend is next.
 
 ---
 
@@ -12,20 +13,23 @@ Built with **FastAPI**, **PostgreSQL**, **SQLAlchemy 2.x**, **Alembic** and **Py
 
 1. [Tech stack](#tech-stack)
 2. [Project structure](#project-structure)
-3. [Prerequisites](#prerequisites)
-4. [Setup (first run)](#setup-first-run)
-5. [Running the API](#running-the-api)
-6. [API overview](#api-overview)
-7. [Authentication flow](#authentication-flow)
-8. [Roles and permissions (RBAC)](#roles-and-permissions-rbac)
-9. [Response format](#response-format)
-10. [Pagination, search and sorting](#pagination-search-and-sorting)
-11. [Database migrations](#database-migrations)
-12. [Testing](#testing)
-13. [Security notes](#security-notes)
-14. [Environment variables](#environment-variables)
-15. [Production deployment](#production-deployment)
-16. [Roadmap](#roadmap)
+3. [Modules at a glance](#modules-at-a-glance)
+4. [Prerequisites](#prerequisites)
+5. [Setup (first run)](#setup-first-run)
+6. [Running the API](#running-the-api)
+7. [API overview](#api-overview)
+8. [Authentication flow](#authentication-flow)
+9. [Roles and permissions (RBAC)](#roles-and-permissions-rbac)
+10. [Business rules by module](#business-rules-by-module)
+11. [Response format](#response-format)
+12. [Pagination, search and sorting](#pagination-search-and-sorting)
+13. [Document numbers](#document-numbers)
+14. [Database migrations](#database-migrations)
+15. [Testing](#testing)
+16. [Security notes](#security-notes)
+17. [Environment variables](#environment-variables)
+18. [Production deployment](#production-deployment)
+19. [Roadmap](#roadmap)
 
 ---
 
@@ -42,6 +46,7 @@ Built with **FastAPI**, **PostgreSQL**, **SQLAlchemy 2.x**, **Alembic** and **Py
 | Driver             | psycopg 3                                        |
 | Auth               | JWT (PyJWT, HS256) with access + refresh tokens  |
 | Password hashing   | Argon2id (argon2-cffi)                           |
+| Documents          | ReportLab (invoice PDF), openpyxl (Excel export) |
 | Tests              | pytest + FastAPI TestClient against real Postgres |
 | Lint / format      | ruff (config in `pyproject.toml`)                |
 
@@ -55,27 +60,52 @@ backend/
 │   ├── main.py              # App factory: middleware, routers, exception handlers
 │   ├── config.py            # Settings loaded from environment / .env
 │   ├── database.py          # Engine, session factory, get_db dependency
-│   ├── models/              # SQLAlchemy models (User, Role, Permission, tokens)
+│   ├── models/              # SQLAlchemy models, one file per module
 │   ├── schemas/             # Pydantic request/response schemas + response envelope
-│   ├── repositories/        # Database queries (no business rules)
-│   ├── services/            # Business logic and rules (auth, users, roles)
+│   ├── repositories/        # Database queries and shared query helpers (no business rules)
+│   ├── services/            # Business logic and rules, one service per module
 │   ├── routers/             # HTTP endpoints (thin: validate → call service → respond)
 │   ├── auth/                # Hashing, JWT, auth/RBAC dependencies, permission catalogue
-│   ├── middleware/          # Request ID + logging, security headers, rate limiting
-│   ├── utils/               # Exceptions, logging, validators, time helpers
-│   └── seed/                # Development seed script
-├── migrations/              # Alembic environment + versioned migrations
+│   ├── middleware/          # Request ID + logging, security headers, body size limit, rate limiting
+│   ├── utils/               # Exceptions, logging, validators, money, time, document numbers
+│   ├── seed/                # Seed script (permissions, roles, company, first admin)
+│   └── tasks/               # Maintenance jobs (housekeeping)
+├── migrations/              # Alembic environment + versioned migrations (0001–0009)
 ├── tests/                   # pytest suite
 ├── .env.example             # Template for .env (committed)
 ├── .env                     # Your local secrets (NEVER committed)
 ├── alembic.ini
 ├── pyproject.toml           # ruff configuration
 ├── pytest.ini
-└── requirements.txt
+├── requirements.txt         # Runtime dependencies
+└── requirements-dev.txt     # Runtime + test and lint tools
 ```
 
 Request flow: **router → service → repository → database**. Routers never contain business rules;
-repositories never decide who is allowed to do what.
+repositories never decide who is allowed to do what. Standard master-data endpoints (customers,
+suppliers, products, categories, warehouses, assets) are generated by a shared router factory
+(`app/routers/crud.py`) on top of a shared service (`app/services/master_data.py`).
+
+---
+
+## Modules at a glance
+
+| Module | What it covers | Main permissions |
+| ------ | -------------- | ---------------- |
+| Authentication | Login, refresh, logout, change and reset password | — |
+| Users and roles | Users, custom roles, permission catalogue | `users.*`, `roles.*`, `permissions.view` |
+| Audit log | Who did what, when, from where, with before/after values | `audit.view` |
+| Notifications | Per-user approval requests, decisions and stock alerts | `notifications.view` |
+| Company | Company profile, branches, departments, system settings | `company.*`, `settings.*` |
+| HR | Employees, salary visibility, termination, leave requests and balances | `employees.*`, `leave.*` |
+| Customers / suppliers | Customer credit limits and terms, supplier bank details | `customers.*`, `suppliers.*` |
+| Products | Categories, goods and services, prices, VAT rates, reorder levels | `products.*` |
+| Inventory | Warehouses, stock levels, movement ledger, adjustments, transfers, low stock | `inventory.*` |
+| Sales | Invoices, stock issue, credit limits, customer payments, invoice PDF | `sales.*`, `finance.create` |
+| Procurement | Purchase orders, approvals, goods received notes | `procurement.*` |
+| Finance | Expenses, supplier bills and payments, aging, customer statements | `finance.*` |
+| Assets | Asset register, depreciation, assignment, disposal | `assets.*` |
+| Dashboard and reports | Role-aware dashboard, 12 reports, CSV/Excel export | `dashboard.view`, `reports.*` |
 
 ---
 
@@ -107,7 +137,7 @@ CREATE DATABASE nyangu_erp_test;   -- used only by the automated tests
 cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 > If PowerShell blocks the activate script, run once:
@@ -119,7 +149,7 @@ pip install -r requirements.txt
 cd backend
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 In VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → choose the one inside `.venv`.
@@ -150,15 +180,15 @@ In `.env`, set at minimum:
 alembic upgrade head
 ```
 
-### 5. Seed roles, permissions and the first admin
+### 5. Seed roles, permissions, the company profile and the first admin
 
 ```bash
 python -m app.seed.run
 ```
 
-This creates the 60-permission catalogue, the 8 system roles with default grants, and one
-`SUPER_ADMIN` account from `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`. It is safe to run again:
-existing data is left in place.
+This creates the 60-permission catalogue, the 8 system roles with default grants, the company
+profile ("Nyangu Holdings", editable later), and one `SUPER_ADMIN` account from
+`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`. It is safe to run again: existing data is left in place.
 
 The admin password must be at least 10 characters with an uppercase letter, a lowercase letter,
 a digit and a symbol.
@@ -190,11 +220,16 @@ Then open:
 **Trying it in Swagger:** call `POST /api/v1/auth/login`, copy `access_token` from the response,
 click **Authorize** (top right), paste the token, and every protected endpoint will work.
 
+**Emails in development** (password reset links) are written as `.eml` files to `backend/var/outbox/`
+(`EMAIL_BACKEND=file`). Open them with any mail client.
+
 ---
 
 ## API overview
 
-All endpoints are versioned under `/api/v1`.
+All endpoints are versioned under `/api/v1`; Swagger at `/docs` documents every request and
+response. Below, *CRUD* means list (`GET /x`), create (`POST /x`), get (`GET /x/{id}`),
+update (`PUT /x/{id}`, only fields sent change) and delete (`DELETE /x/{id}`).
 
 ### Health
 
@@ -211,10 +246,12 @@ All endpoints are versioned under `/api/v1`.
 | POST   | `/auth/logout`           | Yes  | Revoke current tokens; `all_devices: true` logs out everywhere |
 | GET    | `/auth/me`               | Yes  | Current user, roles and effective permissions        |
 | POST   | `/auth/change-password`  | Yes  | Change own password; returns a fresh token pair      |
+| POST   | `/auth/forgot-password`  | No   | Email a single-use reset link (same response whether or not the account exists) |
+| POST   | `/auth/reset-password`   | No   | Set a new password with the emailed token            |
 
 \* Requires a valid refresh token in the body instead of an access token.
 
-### Users
+### Users, roles and permissions
 
 | Method | Path                            | Permission            | Description                         |
 | ------ | ------------------------------- | --------------------- | ----------------------------------- |
@@ -225,17 +262,122 @@ All endpoints are versioned under `/api/v1`.
 | PATCH  | `/users/{id}/status`            | `users.update`        | Activate / deactivate               |
 | PUT    | `/users/{id}/roles`             | `users.assign_roles`  | Replace the user's roles            |
 | POST   | `/users/{id}/reset-password`    | `users.reset_password`| Admin password reset                |
+| GET/POST | `/roles`                      | `roles.view` / `roles.create` | List (with user counts) / create a custom role |
+| GET/PUT/DELETE | `/roles/{id}`           | `roles.view` / `roles.update` / `roles.delete` | Role detail, update, delete unused custom role |
+| GET    | `/permissions`                  | `permissions.view`    | Full permission catalogue (`?module=users`) |
 
-### Roles and permissions
+### Audit log and notifications
 
-| Method | Path              | Permission          | Description                                 |
-| ------ | ----------------- | ------------------- | ------------------------------------------- |
-| GET    | `/roles`          | `roles.view`        | List roles with permissions and user counts |
-| POST   | `/roles`          | `roles.create`      | Create a custom role                        |
-| GET    | `/roles/{id}`     | `roles.view`        | Role detail                                 |
-| PUT    | `/roles/{id}`     | `roles.update`      | Update a role / replace its permissions     |
-| DELETE | `/roles/{id}`     | `roles.delete`      | Delete an unused custom role                |
-| GET    | `/permissions`    | `permissions.view`  | Full permission catalogue (`?module=users`) |
+| Method | Path                               | Permission           | Description |
+| ------ | ---------------------------------- | -------------------- | ----------- |
+| GET    | `/audit-logs`                      | `audit.view`         | Filter by actor, action prefix (`users.`), entity, dates |
+| GET    | `/audit-logs/{id}`                 | `audit.view`         | One entry with its before/after changes |
+| GET    | `/notifications`                   | `notifications.view` | Your notifications (`?unread_only=true`) |
+| GET    | `/notifications/unread-count`      | `notifications.view` | Badge count |
+| POST   | `/notifications/{id}/read`, `/notifications/read-all` | `notifications.view` | Mark as read |
+
+### Company, branches, departments and settings
+
+| Method | Path | Permission | Description |
+| ------ | ---- | ---------- | ----------- |
+| GET/PUT | `/company` | `company.view` / `company.update` | Company profile (TPIN, VAT number, fiscal year) |
+| CRUD | `/branches` | read: any signed-in user; write: `company.update` | One head office at a time |
+| CRUD | `/departments` | read: any signed-in user; write: `company.update` | |
+| GET/PUT | `/settings` | `settings.view` / `settings.update` | Default VAT (16%), payment terms, annual leave days, low-stock alerts, invoice footer |
+
+### HR
+
+| Method | Path | Permission | Description |
+| ------ | ---- | ---------- | ----------- |
+| CRUD | `/employees` | `employees.*` | Salary/bank fields need `employees.view_salary` |
+| POST | `/employees/{id}/terminate` | `employees.update` | Also deactivates the linked user and cancels future leave |
+| GET | `/employees/{id}/leave-balance` | `leave.view` | Annual entitlement, taken, pending, remaining |
+| GET/POST | `/leave-requests` | `leave.view` / `leave.create` | Working days counted Monday–Friday |
+| POST | `/leave-requests/{id}/approve`, `/reject` | `leave.approve` | Not your own; rejection needs a comment |
+| POST | `/leave-requests/{id}/cancel` | `leave.create` | Pending, or approved and not yet started |
+
+### Customers, suppliers and products
+
+| Method | Path | Permission | Description |
+| ------ | ---- | ---------- | ----------- |
+| CRUD | `/customers` | `customers.*` | Codes `CUS-00001`; credit limit (null = none), payment terms |
+| CRUD | `/suppliers` | `suppliers.*` | Codes `SUP-00001`; bank details |
+| CRUD | `/product-categories` | `products.*` | |
+| CRUD | `/products` | `products.*` | SKU, barcode, goods or service, prices, VAT rate, reorder level |
+
+### Inventory
+
+| Method | Path | Permission | Description |
+| ------ | ---- | ---------- | ----------- |
+| CRUD | `/warehouses` | read: any signed-in user; write: `company.update` | Cannot deactivate while holding stock |
+| GET | `/inventory/stock-levels` | `inventory.view` | Per product and warehouse |
+| GET | `/inventory/products/{id}` | `inventory.view` | One product across warehouses, with stock value |
+| GET | `/inventory/low-stock` | `inventory.view` | At or below reorder level |
+| GET | `/inventory/movements` | `inventory.view` | Immutable ledger with running balances |
+| POST | `/inventory/adjustments` | `inventory.adjust` | Signed change or physical count |
+| POST | `/inventory/transfers` | `inventory.transfer` | Between warehouses |
+
+### Sales
+
+| Method | Path | Permission | Description |
+| ------ | ---- | ---------- | ----------- |
+| GET/POST | `/sales/invoices` | `sales.view` / `sales.create` | Drafts; filter by status, customer, dates, overdue |
+| GET/PUT/DELETE | `/sales/invoices/{id}` | `sales.view` / `sales.update` / `sales.delete` | Drafts only for edit/delete |
+| POST | `/sales/invoices/{id}/approve` | `sales.approve` | Issues: number, credit check, stock out |
+| POST | `/sales/invoices/{id}/cancel` | `sales.delete` | Unpaid issued invoices; stock returned |
+| GET | `/sales/invoices/{id}/pdf` | `sales.view` | Printable tax invoice |
+| POST | `/sales/invoices/{id}/payments` | `finance.create` | Receipt (`RCT-…`); cash, bank, mobile money, cheque, card |
+| GET | `/sales/payments` | `sales.view` or `finance.view` | All receipts |
+| POST | `/sales/payments/{id}/void` | `finance.approve` | Reopens the invoice balance |
+
+### Procurement
+
+| Method | Path | Permission | Description |
+| ------ | ---- | ---------- | ----------- |
+| GET/POST | `/procurement/purchase-orders` | `procurement.view` / `procurement.create` | Approvers are notified |
+| GET/PUT/DELETE | `/procurement/purchase-orders/{id}` | `procurement.view` / `.update` / `.delete` | Drafts only for edit/delete |
+| POST | `/procurement/purchase-orders/{id}/approve` | `procurement.approve` | |
+| POST | `/procurement/purchase-orders/{id}/cancel`, `/close` | `procurement.delete` / `procurement.update` | Cancel if nothing received; close to accept a short delivery |
+| GET/POST | `/procurement/goods-receipts` | view: `procurement.view` or `inventory.view`; receive: `procurement.update` or `inventory.adjust` | Partial deliveries; stock in; average cost updated |
+
+### Finance
+
+| Method | Path | Permission | Description |
+| ------ | ---- | ---------- | ----------- |
+| CRUD | `/finance/expense-categories` | `finance.*` | |
+| GET/POST | `/finance/expenses` | `finance.view` / `finance.create` | Approvers are notified |
+| PUT/DELETE | `/finance/expenses/{id}` | `finance.update` | Pending only |
+| POST | `/finance/expenses/{id}/approve`, `/reject` | `finance.approve` | Not your own |
+| GET/POST | `/finance/bills` | `finance.view` / `finance.create` | Supplier bills, optional PO link |
+| POST | `/finance/bills/{id}/approve`, `/cancel` | `finance.approve` | |
+| POST | `/finance/bills/{id}/payments` | `finance.create` | Payment (`PAY-…`) |
+| GET | `/finance/supplier-payments` | `finance.view` | |
+| POST | `/finance/supplier-payments/{id}/void` | `finance.approve` | |
+| GET | `/finance/receivables`, `/finance/payables` | `finance.view` | Aging: current, 1–30, 31–60, 61–90, 90+ days |
+| GET | `/finance/customers/{id}/statement` | `finance.view` | Opening balance, invoices, payments, running balance |
+
+### Assets
+
+| Method | Path | Permission | Description |
+| ------ | ---- | ---------- | ----------- |
+| CRUD | `/asset-categories` | `assets.*` | Default method and useful life |
+| CRUD | `/assets` | `assets.*` | Tags `AST-00001`; book value computed as of today |
+| POST | `/assets/{id}/assign` | `assets.update` | To an employee, or back to store |
+| POST | `/assets/{id}/dispose` | `assets.delete` | Proceeds and gain/loss |
+| GET | `/assets/{id}/depreciation-schedule` | `assets.view` | Yearly schedule |
+
+### Dashboard and reports
+
+| Method | Path | Permission | Description |
+| ------ | ---- | ---------- | ----------- |
+| GET | `/dashboard/summary` | `dashboard.view` | Sections appear only for modules you may view; pending approvals only for what you may approve |
+| GET | `/reports` | `reports.view` | Report catalogue |
+| GET | `/reports/{key}` | `reports.view` (+ `reports.export` for `format=csv|xlsx`) | Dates default to the current month |
+
+Reports: `sales-summary` (by month, day or customer), `sales-by-product` (with margin),
+`profit-and-loss`, `vat-summary` (output vs input VAT), `purchases-by-supplier`,
+`expenses-by-category`, `inventory-valuation`, `stock-movements`, `receivables-aging`,
+`payables-aging`, `headcount` (by department or branch), `asset-register`.
 
 ---
 
@@ -290,15 +432,21 @@ Example response (abbreviated):
 | ----------------------------------- | -------------------------------------------------------- |
 | Logout                              | Access token deny-listed; supplied refresh token revoked |
 | Logout with `all_devices: true`     | Every token of that user stops working                   |
-| Password change / admin reset       | All other sessions end immediately                       |
-| User deactivated                    | All tokens stop working on the next request              |
+| Password change / admin reset / reset by email | All other sessions end immediately            |
+| User deactivated (or employee terminated) | All tokens stop working on the next request        |
 | Old refresh token re-used           | Treated as theft — all of that user's sessions revoked   |
 
 Each user has a `token_version` stored in the database and copied into every JWT. Bumping it
 invalidates all existing tokens at once without keeping a list of them.
 
 **Login protection:** after 5 consecutive wrong passwords the account is locked for 15 minutes,
-and login is rate-limited to 10 attempts per minute per IP (both configurable).
+and login is rate-limited to 10 attempts per minute per IP (both configurable). Password reset
+requests are limited to 5 per hour per IP.
+
+**Forgotten password:** `POST /auth/forgot-password` always answers the same way. If an active
+account uses the address, it receives a link to `FRONTEND_URL/reset-password?token=…`. The token
+is single-use, expires after 30 minutes, only its SHA-256 hash is stored, and requesting a new
+link invalidates older ones.
 
 ---
 
@@ -321,34 +469,70 @@ Roles are collections of permissions; users can hold several roles.
 | `STOREKEEPER`         | Products and inventory                                          |
 
 The full catalogue lives in [`app/auth/permissions.py`](app/auth/permissions.py) and is the single
-source of truth. Permissions for later modules are already defined so roles can be configured now.
+source of truth.
 
 **Protecting an endpoint:**
 
 ```python
-from app.auth.dependencies import AuthContext, require_permissions
+from app.auth.dependencies import auth_with
 from app.auth.permissions import Perm
 
 @router.get("/users")
-def list_users(ctx: Annotated[AuthContext, Depends(require_permissions(Perm.USERS_VIEW))]):
+def list_users(ctx: auth_with(Perm.USERS_VIEW), db: DbSession):
     ...
 ```
 
-Permissions are loaded from the database on every request, so a role change takes effect
-immediately — the user does not need to log in again.
+`auth_with_any(...)` accepts any one of several permissions. Permissions are loaded from the
+database on every request, so a role change takes effect immediately.
 
-**Built-in business rules**
+**Built-in rules**
 
 - Only a `SUPER_ADMIN` can create, edit, deactivate or reset a Super Administrator, or grant that role.
 - At least one active `SUPER_ADMIN` must always remain.
 - Users cannot deactivate themselves or change their own roles.
 - A non-super-admin can only grant permissions they already hold (prevents privilege escalation).
 - The `SUPER_ADMIN` role cannot be edited; system roles cannot be deleted or deactivated.
-- Roles still assigned to users cannot be deleted.
+- Roles still assigned to users cannot be deleted. Deactivated roles grant nothing.
 - Deactivated users cannot log in.
 
 The frontend should use `GET /auth/me → permissions` to show or hide menus, **but the backend
 enforces every check independently.** Hiding a button is never a security control.
+
+---
+
+## Business rules by module
+
+**Everywhere**
+
+- Every change is written to the audit log in the same transaction, with before/after values.
+  Salary amounts are recorded as `***`.
+- Reference records that other records use cannot be deleted; the API says to deactivate them.
+- Money is `NUMERIC(14,2)`, quantities `NUMERIC(14,3)`; each line is rounded half-up to the cent.
+- Dates are business dates in Africa/Lusaka; timestamps are stored in UTC.
+
+**HR:** employee numbers are generated; NRC, email and linked user are unique. Terminating an
+employee deactivates their user account (with the same Super Admin protections) and cancels
+future leave. Annual leave cannot exceed the entitlement (`annual_leave_days`, default 24) minus
+approved and pending days; overlapping requests are refused; nobody approves their own leave.
+
+**Inventory:** stock never goes negative (rows are locked while changing). Every change writes a
+ledger entry with the balance after. Receiving goods updates the product's weighted average cost.
+Crossing below a product's reorder level notifies inventory staff once.
+
+**Sales:** drafts do not touch stock. Approval assigns a gap-free `INV-YYYY-NNNNN` number, checks
+the customer's credit limit (outstanding + this invoice), issues goods from the chosen warehouse
+and records each line's cost for cost of sales. If anything fails, nothing is kept. Only unpaid
+invoices can be cancelled; their goods return to stock. Payments cannot exceed the balance.
+
+**Procurement:** purchase orders go draft → approved → partially received → received (or closed
+short, or cancelled if nothing was received). Receipts cannot exceed what is outstanding.
+
+**Finance:** nobody approves their own expense. Supplier bills detect duplicate supplier invoice
+numbers, and bills linked to a purchase order cannot exceed the order total. Only approved bills
+can be paid. Aging buckets use days past the due date, as of today.
+
+**Assets:** straight-line depreciation monthly down to salvage value; disposed assets are frozen
+and show the gain or loss against book value on the disposal date.
 
 ---
 
@@ -377,19 +561,21 @@ Every response uses the same envelope.
 
 | HTTP | `error_code`              | Meaning                                         |
 | ---- | ------------------------- | ----------------------------------------------- |
-| 400  | `BAD_REQUEST`             | e.g. wrong current password, invalid sort field |
+| 400  | `BAD_REQUEST`             | e.g. wrong current password, invalid sort field, unknown reference |
 | 401  | `UNAUTHENTICATED`         | Missing, invalid, expired or revoked token      |
 | 403  | `FORBIDDEN`               | Logged in but lacking the permission            |
 | 404  | `NOT_FOUND`               | Resource does not exist                         |
 | 409  | `CONFLICT`                | Duplicate (e.g. email already used)             |
+| 413  | `PAYLOAD_TOO_LARGE`       | Request body above `MAX_REQUEST_BODY_BYTES`     |
 | 422  | `VALIDATION_ERROR`        | Request body/query failed validation            |
 | 422  | `BUSINESS_RULE_VIOLATION` | Valid input that breaks a business rule         |
 | 429  | `RATE_LIMITED`            | Too many requests                               |
 | 500  | `INTERNAL_ERROR`          | Unexpected error (details logged, never shown)  |
 | 503  | `DATABASE_ERROR`          | Database unavailable                            |
 
-Stack traces, SQL, password hashes and secrets are never returned to clients.
-Every response carries an `X-Request-ID` header to match it with the server logs.
+**Money and quantities are decimals serialised as strings** (`"1500.00"`, `"12.500"`) so no
+precision is lost; send them as strings or numbers. Stack traces, SQL, password hashes and secrets
+are never returned. Every response carries an `X-Request-ID` header to match it with the server logs.
 
 ---
 
@@ -401,8 +587,8 @@ List endpoints accept:
 | ------------ | ------- | ---------------------------------------- |
 | `page`       | 1       | ≥ 1                                      |
 | `page_size`  | 20      | 1–100 (requests above 100 are rejected)  |
-| `search`     | —       | Case-insensitive text match              |
-| `sort_by`    | varies  | Only whitelisted fields are accepted     |
+| `search`     | —       | Case-insensitive text match (`%` and `_` match literally) |
+| `sort_by`    | varies  | Only whitelisted fields are accepted (listed in each endpoint's description) |
 | `sort_order` | varies  | `asc` or `desc`                          |
 
 ```text
@@ -420,6 +606,23 @@ Paginated `data` looks like:
 
 ---
 
+## Document numbers
+
+| Document | Format | Assigned |
+| -------- | ------ | -------- |
+| Sales invoice | `INV-2026-00001` | When issued (drafts have none) |
+| Customer receipt | `RCT-2026-00001` | On payment |
+| Purchase order | `PO-2026-00001` | On creation |
+| Goods received note | `GRN-2026-00001` | On receipt |
+| Supplier bill / payment | `BILL-2026-00001` / `PAY-2026-00001` | On creation |
+| Expense | `EXP-2026-00001` | On submission |
+| Stock adjustment / transfer | `ADJ-2026-00001` / `TRF-2026-00001` | On posting |
+| Employee / customer / supplier / asset | `EMP-00001` / `CUS-00001` / `SUP-00001` / `AST-00001` | On creation |
+
+Counters are incremented inside the same transaction, so a failed request does not burn a number.
+
+---
+
 ## Database migrations
 
 Never change tables by hand. Every schema change goes through Alembic:
@@ -427,7 +630,7 @@ Never change tables by hand. Every schema change goes through Alembic:
 ```bash
 # 1. Change or add models in app/models/ (and import new ones in app/models/__init__.py)
 # 2. Generate a migration
-alembic revision --autogenerate -m "create customers table"
+alembic revision --autogenerate -m "describe the change"
 # 3. REVIEW the generated file in migrations/versions/
 # 4. Apply it
 alembic upgrade head
@@ -441,6 +644,10 @@ alembic history          # list migrations
 alembic downgrade -1     # undo the last migration
 alembic check            # fails if models and migrations are out of sync
 ```
+
+Current migrations: `0001` users/roles/tokens, `0002` audit/notifications/password reset/sequences,
+`0003` company/HR, `0004` customers/suppliers/products, `0005` inventory, `0006` sales,
+`0007` procurement, `0008` finance, `0009` assets.
 
 Conventions: UUID primary keys everywhere, timezone-aware `created_at` / `updated_at` on every
 major table, and deterministic constraint names (`pk_`, `fk_`, `uq_`, `ix_`, `ck_`) so migrations
@@ -457,23 +664,26 @@ test, so **never point it at `nyangu_erp`** (the test setup refuses to).
 ```bash
 pytest            # run everything
 pytest -v         # verbose
-pytest tests/test_auth.py -k refresh   # a subset
+pytest tests/test_sales.py -k credit   # a subset
 ruff check . && ruff format --check .  # lint and formatting
 ```
 
-Current suite: **75 tests, all passing**, covering:
+Current suite: **156 tests, all passing**, covering:
 
-- **Authentication:** login by email/username, invalid login, Argon2 hashing, account lockout,
-  rate limiting, expired/forged/`alg=none` tokens, refresh-token rotation and reuse detection,
-  logout, logout-all-devices, password change
-- **Users:** create, duplicates, validation, update, list/search/filter/sort, role assignment,
-  deactivation, admin password reset
-- **Permissions:** forbidden access by role, view-only users, Super Admin protection,
-  privilege-escalation prevention, role changes applying without a new login, inactive roles
-- **Roles:** custom role lifecycle, system-role protection, roles in use, permission catalogue,
-  idempotent seeding
-- **Platform:** health check (including database down), docs, security headers, request IDs, CORS,
-  error envelope, safe 500s, configuration safety, log masking, every endpoint documented
+- **Authentication:** login by email/username, lockout, rate limiting, forged/expired/`alg=none`
+  tokens, refresh rotation and reuse detection, logout, password change, email password reset
+- **Users, roles, permissions:** CRUD, validation, Super Admin protection, privilege escalation,
+  role changes applying without a new login
+- **Platform:** health (including database down), docs, security headers, request IDs, CORS,
+  error envelope, safe 500s, body size limit, configuration guards, log masking
+- **Audit and notifications:** diffs, request IDs, secrets never logged, private notifications
+- **Company and HR:** head office rule, settings, salary visibility, termination, leave rules
+- **Master data and inventory:** customers, suppliers, products, adjustments, transfers,
+  no negative stock, weighted average cost, low-stock alerts
+- **Sales, procurement, finance:** totals and rounding, credit limits, stock issue and return,
+  payments and voids, partial receipts, bill rules, aging, statements
+- **Assets and reports:** depreciation, disposal, dashboard permissions, every report's figures,
+  CSV and Excel export, housekeeping
 
 ---
 
@@ -484,13 +694,16 @@ Current suite: **75 tests, all passing**, covering:
 - JWT algorithm pinned to HS256 (blocks `alg=none` and algorithm-confusion attacks); issuer and
   token type are validated.
 - Login timing is the same for existing and non-existing accounts, and wrong-email vs
-  wrong-password return the same message.
+  wrong-password return the same message. Forgot-password never reveals whether an account exists.
 - Security headers on every response (`nosniff`, `X-Frame-Options: DENY`, CSP, `no-store`;
-  HSTS in production).
-- CORS restricted to `CORS_ORIGINS`.
-- Log messages are filtered to mask anything that looks like a password or token.
+  HSTS in production). Request bodies are capped (`MAX_REQUEST_BODY_BYTES`, default 2 MB).
+- CORS restricted to `CORS_ORIGINS` (`*` is refused outside development).
+- Log messages are filtered to mask anything that looks like a password, token or hash.
 - SQL injection is prevented by SQLAlchemy parameter binding; sort fields are whitelisted.
-- The app refuses to start in `staging`/`production` with a weak `SECRET_KEY` or with `DEBUG=true`.
+- The app refuses to start in `staging`/`production` with a weak `SECRET_KEY`, `DEBUG=true`,
+  `CORS_ORIGINS=*` or the in-memory email backend.
+- Salary and bank details are hidden without `employees.view_salary`, and the audit log records
+  that they changed but not their values.
 
 **Known limitation:** the rate limiter is in-memory, which is correct for a single worker.
 When running multiple workers or servers, move it to Redis (same interface in
@@ -502,41 +715,71 @@ When running multiple workers or servers, move it to Redis (same interface in
 
 | Variable                        | Default                  | Description                              |
 | ------------------------------- | ------------------------ | ---------------------------------------- |
-| `APP_NAME`                      | Nyangu Holdings ERP      | Shown in docs and health                 |
+| `APP_NAME`                      | Nyangu Holdings ERP      | Shown in docs, health and emails         |
 | `ENVIRONMENT`                   | development              | development / testing / staging / production |
 | `DEBUG`                         | false                    | Must be false outside development        |
 | `LOG_LEVEL`                     | INFO                     |                                          |
+| `LOG_FORMAT`                    | text                     | `json` for log shippers                  |
 | `DATABASE_URL`                  | — (required)             | `postgresql+psycopg://user:pass@host:5432/nyangu_erp` |
 | `TEST_DATABASE_URL`             | —                        | Disposable DB for pytest                 |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | 10 / 20               | Connection pool per process              |
 | `SECRET_KEY`                    | — (required)             | ≥ 32 random chars outside development    |
 | `ACCESS_TOKEN_EXPIRE_MINUTES`   | 60                       |                                          |
 | `REFRESH_TOKEN_EXPIRE_DAYS`     | 7                        |                                          |
 | `MAX_FAILED_LOGIN_ATTEMPTS`     | 5                        | Before lockout                           |
 | `ACCOUNT_LOCKOUT_MINUTES`       | 15                       |                                          |
 | `LOGIN_RATE_LIMIT_PER_MINUTE`   | 10                       | Per IP                                   |
+| `PASSWORD_RESET_EXPIRE_MINUTES` | 30                       | Reset link lifetime                      |
+| `PASSWORD_RESET_RATE_LIMIT_PER_HOUR` | 5                   | Per IP                                   |
 | `CORS_ORIGINS`                  | http://localhost:5173    | Comma-separated                          |
+| `FRONTEND_URL`                  | http://localhost:5173    | Used in emailed links                    |
+| `MAX_REQUEST_BODY_BYTES`        | 2097152                  | Larger bodies get 413                    |
+| `DOCS_ENABLED`                  | true                     | Set false to hide `/docs` and `/redoc`   |
+| `EMAIL_BACKEND`                 | file                     | `file` (dev outbox), `smtp`, `console`, `memory` (tests) |
+| `EMAIL_FROM`                    | Nyangu Holdings ERP <no-reply@…> |                                  |
+| `EMAIL_FILE_DIR`                | var/outbox               | For `EMAIL_BACKEND=file`                 |
+| `SMTP_HOST` / `SMTP_PORT`       | — / 587                  | Required for `EMAIL_BACKEND=smtp`        |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | —                      |                                          |
+| `SMTP_USE_TLS`                  | true                     | STARTTLS                                 |
 | `DEFAULT_CURRENCY`              | ZMW                      |                                          |
-| `TIMEZONE`                      | Africa/Lusaka            |                                          |
+| `TIMEZONE`                      | Africa/Lusaka            | Business dates and document years        |
 | `SEED_ADMIN_EMAIL`              | —                        | First admin (seed only)                  |
 | `SEED_ADMIN_PASSWORD`           | —                        | Leave empty to be prompted               |
+
+Business settings (VAT rate, payment terms, leave days, low-stock alerts, invoice footer) are
+edited at runtime through `/settings`, not environment variables.
 
 ---
 
 ## Production deployment
+
+**With Docker Compose** (`deployment/docker/`): the backend image runs as a non-root user, applies
+migrations on start (`RUN_MIGRATIONS=true`), has a health check, and runs uvicorn with proxy
+headers. The frontend image serves the built app with nginx and proxies `/api` to the backend.
+
+```bash
+cd deployment/docker
+export POSTGRES_PASSWORD=... SECRET_KEY=... CORS_ORIGINS=https://erp.example.co.zm FRONTEND_URL=https://erp.example.co.zm
+docker compose up --build -d
+docker compose exec backend python -m app.seed.run    # with SEED_ADMIN_EMAIL/PASSWORD set
+```
+
+**Housekeeping:** schedule `python -m app.tasks.housekeeping` daily. It removes expired tokens,
+spent password-reset tokens and read notifications older than 180 days.
 
 Checklist before going live:
 
 - [ ] `ENVIRONMENT=production`, `DEBUG=false`, strong unique `SECRET_KEY`
 - [ ] Managed PostgreSQL; the app connects as a dedicated user that **owns only its schema**
       (not the `postgres` superuser)
-- [ ] `alembic upgrade head` run as part of each deployment
-- [ ] Run behind a reverse proxy (Nginx/Caddy) that terminates **HTTPS**
-- [ ] Start uvicorn with `--proxy-headers --forwarded-allow-ips=<proxy IP>` so client IPs
-      (used for rate limiting and logs) are correct
-- [ ] `CORS_ORIGINS` set to the real frontend domain only
+- [ ] `alembic upgrade head` run as part of each deployment (automatic in the Docker image)
+- [ ] HTTPS terminated in front of nginx (load balancer, Caddy, or an nginx TLS server block)
+- [ ] `CORS_ORIGINS` and `FRONTEND_URL` set to the real frontend domain
+- [ ] `EMAIL_BACKEND=smtp` with working SMTP credentials (password reset emails)
 - [ ] Rate limiter moved to Redis if running more than one worker
-- [ ] Logs shipped to a central system; error tracking (e.g. Sentry) configured
+- [ ] Logs shipped to a central system (`LOG_FORMAT=json`); error tracking (e.g. Sentry) configured
 - [ ] Monitoring hits `/api/v1/health`
+- [ ] Housekeeping job scheduled
 - [ ] Automated backups (see below)
 
 **Backups.** Take automated daily `pg_dump` backups (or use the managed provider's point-in-time
@@ -549,9 +792,6 @@ pg_dump -Fc -h <host> -U <user> nyangu_erp > nyangu_erp_$(date +%F).dump
 pg_restore -d nyangu_erp_restored nyangu_erp_2026-09-27.dump
 ```
 
-Housekeeping: expired rows in `refresh_tokens` and `revoked_access_tokens` can be purged with
-`TokenRepository.purge_expired()` (to be scheduled as a background job).
-
 ---
 
 ## Roadmap
@@ -559,12 +799,17 @@ Housekeeping: expired rows in `refresh_tokens` and `revoked_access_tokens` can b
 | Phase | Scope                                             | Status        |
 | ----- | ------------------------------------------------- | ------------- |
 | 1     | Config, DB, Alembic, health, users, roles, permissions, JWT, RBAC | ✅ Done |
-| 2     | Forgot/reset password by email, audit log foundation | Next        |
-| 3     | Company, branches, employees                      | Planned       |
-| 4     | Customers, suppliers, products                    | Planned       |
-| 5     | Inventory, warehouses, stock movements            | Planned       |
-| 6     | Sales, invoices, payments                         | Planned       |
-| 7     | Procurement, purchase orders, goods received      | Planned       |
-| 8     | Finance, expenses, receivables, payables          | Planned       |
-| 9     | Assets, notifications, audit logs                 | Planned       |
-| 10    | Dashboard, reports, production hardening          | Planned       |
+| 2     | Forgot/reset password by email, audit log, notifications | ✅ Done |
+| 3     | Company, branches, departments, settings, employees, leave | ✅ Done |
+| 4     | Customers, suppliers, products                    | ✅ Done |
+| 5     | Inventory, warehouses, stock movements            | ✅ Done |
+| 6     | Sales, invoices, payments, invoice PDF            | ✅ Done |
+| 7     | Procurement, purchase orders, goods received      | ✅ Done |
+| 8     | Finance, expenses, receivables, payables          | ✅ Done |
+| 9     | Assets                                            | ✅ Done |
+| 10    | Dashboard, reports, production hardening          | ✅ Done |
+| Next  | React frontend for every module                   | Planned |
+
+Possible later additions: purchase requisitions, credit notes and sales returns, payroll,
+public-holiday calendar for leave, general ledger and bank reconciliation, ZRA Smart Invoice
+integration, Redis-backed rate limiting.
