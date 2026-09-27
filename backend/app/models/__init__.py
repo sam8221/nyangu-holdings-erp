@@ -6,6 +6,7 @@ from app.models.inventory import StockLevel, StockMovement, Warehouse
 from app.models.organization import Branch, Company, Department, SystemSetting
 from app.models.partners import Customer, Product, ProductCategory, Supplier
 from app.models.rbac import Permission, Role, role_permissions, user_roles
+from app.models.sales import CustomerPayment, SalesInvoice, SalesInvoiceLine
 from app.models.system import AuditLog, DocumentSequence, Notification, PasswordResetToken
 from app.models.token import RefreshToken, RevokedAccessToken
 from app.models.user import User, UserStatus
@@ -16,6 +17,7 @@ __all__ = [
     "Branch",
     "Company",
     "Customer",
+    "CustomerPayment",
     "Department",
     "DocumentSequence",
     "Employee",
@@ -28,6 +30,8 @@ __all__ = [
     "RefreshToken",
     "RevokedAccessToken",
     "Role",
+    "SalesInvoice",
+    "SalesInvoiceLine",
     "Supplier",
     "StockLevel",
     "StockMovement",

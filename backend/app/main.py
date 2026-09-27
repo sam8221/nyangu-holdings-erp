@@ -27,6 +27,7 @@ from app.routers import (
     organization,
     partners,
     roles,
+    sales,
     system,
     users,
 )
@@ -55,6 +56,7 @@ ROUTERS = [
     partners.products_router,
     inventory.warehouses_router,
     inventory.inventory_router,
+    sales.router,
 ]
 
 _HTTP_ERROR_CODES = {

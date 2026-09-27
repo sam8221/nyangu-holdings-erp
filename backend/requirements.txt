@@ -8,6 +8,8 @@ pydantic[email]>=2.13,<3
 pydantic-settings>=2.15,<3
 pyjwt>=2.15,<3
 argon2-cffi>=25.1
+reportlab>=4.2
+openpyxl>=3.1
 
 # Tests and tooling
 pytest>=9.1
