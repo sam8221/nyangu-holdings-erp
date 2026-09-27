@@ -15,8 +15,9 @@ Setup, API, business rules and deployment are documented in [backend/README.md](
 and every endpoint is browsable in Swagger at `/docs` once the API is running.
 
 The frontend (React + Ant Design, white and light-blue theme) has its foundation in place:
-sign-in and password flows, the permission-aware layout, the dashboard, users and roles. See
-[frontend/README.md](frontend/README.md). The remaining module screens are next.
+sign-in and password flows, the permission-aware layout, the dashboard, users and roles, company
+setup, HR, customers, suppliers, products and inventory. See
+[frontend/README.md](frontend/README.md). Sales, procurement, finance, assets and reports are next.
 
 ## Development order
 | # | Area | Backend | Frontend |
@@ -26,9 +27,9 @@ sign-in and password flows, the permission-aware layout, the dashboard, users an
 | 3 | Authentication and RBAC | Done | Done |
 | 4 | Dashboard | Done | Done |
 | 5 | Users | Done | Done (users and roles) |
-| 6 | Employees | Done | To do |
-| 7 | Customers and suppliers | Done | To do |
-| 8 | Products and inventory | Done | To do |
+| 6 | Employees | Done | Done (employees and leave) |
+| 7 | Customers and suppliers | Done | Done |
+| 8 | Products and inventory | Done | Done |
 | 9 | Sales | Done | To do |
 | 10 | Procurement | Done | To do |
 | 11 | Finance | Done | To do |

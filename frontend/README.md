@@ -38,6 +38,15 @@ there is no CORS setup to do. To point at another backend, set `VITE_PROXY_TARGE
   Administrator without being one) are not offered.
 - **Roles:** list with user counts, create and edit with permissions grouped by module;
   permissions you do not hold cannot be granted.
+- **Company:** profile (TPIN, VAT, financial year), branches (one head office) and departments;
+  **Settings:** default VAT, payment terms, leave entitlement, low-stock alerts, invoice footer.
+- **HR:** employees (salary and bank details only for users allowed to see them), termination,
+  leave balances; leave requests with working-day count, balance check, approve/reject/cancel.
+- **Customers and suppliers:** credit limits, payment terms, TPIN, contacts, bank details.
+- **Products:** goods and services, categories, prices, VAT rate, reorder level, stock per
+  warehouse.
+- **Inventory:** warehouses, stock levels, low-stock list, adjustments (signed change or physical
+  count), transfers between warehouses, and the movement ledger.
 
 Menu entries for the other modules open a "coming next" page until their screens are built.
 Their APIs already work (see `/docs`).
@@ -65,4 +74,8 @@ src/
   request; hiding a button is only a convenience.
 - New list pages should use `components/DataTable.jsx`: give it a `fetcher`, `columns` (add
   `sortField` to sortable columns, matching the API's sort fields) and optional `filters`.
+- Simple reference data (list + create/edit modal + delete) can use `components/CrudPage.jsx`;
+  pick related records with `components/RemoteSelect.jsx`, which searches the API as you type.
+- Never send fields a user cannot see (for example salary without `employees.view_salary`):
+  the API returns them blank, and sending the blank back would erase the stored value.
 - Show API field errors on forms with `applyFieldErrors(form, error)`.

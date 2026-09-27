@@ -49,3 +49,51 @@ export const notificationsApi = {
   markRead: (id) => api.post(`/notifications/${id}/read`).then(unwrap),
   markAllRead: () => api.post('/notifications/read-all').then(unwrap),
 }
+
+// ---------------------------------------------------------------- company
+export const companyApi = {
+  get: () => api.get('/company').then(unwrap),
+  update: (body) => api.put('/company', body).then(unwrap),
+}
+export const branchesApi = resource('/branches')
+export const departmentsApi = resource('/departments')
+export const settingsApi = {
+  get: () => api.get('/settings').then(unwrap),
+  update: (body) => api.put('/settings', body).then(unwrap),
+}
+
+// ---------------------------------------------------------------- HR
+export const employeesApi = {
+  ...resource('/employees'),
+  terminate: (id, body) => api.post(`/employees/${id}/terminate`, body).then(unwrap),
+  leaveBalance: (id, year) =>
+    api.get(`/employees/${id}/leave-balance`, { params: cleanParams({ year }) }).then(unwrap),
+}
+export const leaveApi = {
+  list: (params = {}) => api.get('/leave-requests', { params: cleanParams(params) }).then(unwrap),
+  create: (body) => api.post('/leave-requests', body).then(unwrap),
+  approve: (id, comment) =>
+    api.post(`/leave-requests/${id}/approve`, comment ? { comment } : {}).then(unwrap),
+  reject: (id, comment) => api.post(`/leave-requests/${id}/reject`, { comment }).then(unwrap),
+  cancel: (id) => api.post(`/leave-requests/${id}/cancel`).then(unwrap),
+}
+
+// ---------------------------------------------------------------- master data
+export const customersApi = resource('/customers')
+export const suppliersApi = resource('/suppliers')
+export const categoriesApi = resource('/product-categories')
+export const productsApi = resource('/products')
+export const warehousesApi = resource('/warehouses')
+
+// ---------------------------------------------------------------- inventory
+export const inventoryApi = {
+  stockLevels: (params = {}) =>
+    api.get('/inventory/stock-levels', { params: cleanParams(params) }).then(unwrap),
+  productStock: (productId) => api.get(`/inventory/products/${productId}`).then(unwrap),
+  lowStock: (params = {}) =>
+    api.get('/inventory/low-stock', { params: cleanParams(params) }).then(unwrap),
+  movements: (params = {}) =>
+    api.get('/inventory/movements', { params: cleanParams(params) }).then(unwrap),
+  adjust: (body) => api.post('/inventory/adjustments', body).then(unwrap),
+  transfer: (body) => api.post('/inventory/transfers', body).then(unwrap),
+}

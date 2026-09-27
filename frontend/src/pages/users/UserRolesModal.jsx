@@ -43,7 +43,7 @@ export default function UserRolesModal({ open, user, roles, onClose }) {
           <Select
             mode="multiple"
             allowClear
-            optionFilterProp="label"
+            showSearch={{ optionFilterProp: 'label' }}
             options={(roles || []).map((r) => ({
               value: r.id,
               label: r.display_name,

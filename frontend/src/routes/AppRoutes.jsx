@@ -1,4 +1,6 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { Spin } from 'antd'
 import { RequireAuth, RequirePermission } from '../auth/guards'
 import AppLayout from '../layout/AppLayout'
 import { MENU_PAGES } from '../layout/menu'
@@ -7,16 +9,32 @@ import Login from '../pages/auth/Login'
 import ResetPassword from '../pages/auth/ResetPassword'
 import ComingSoon from '../pages/common/ComingSoon'
 import NotFound from '../pages/common/NotFound'
-import Dashboard from '../pages/dashboard/Dashboard'
-import RolesPage from '../pages/roles/RolesPage'
-import UsersPage from '../pages/users/UsersPage'
+
+// Each screen is loaded on first visit, keeping the initial download small.
+const named = (loader, name) => lazy(() => loader().then((m) => ({ default: m[name] })))
 
 /** Screens that are built. Every other menu entry shows a "coming next" placeholder. */
 const BUILT = {
-  '/dashboard': Dashboard,
-  '/users': UsersPage,
-  '/roles': RolesPage,
+  '/dashboard': lazy(() => import('../pages/dashboard/Dashboard')),
+  '/users': lazy(() => import('../pages/users/UsersPage')),
+  '/roles': lazy(() => import('../pages/roles/RolesPage')),
+  '/company': lazy(() => import('../pages/company/CompanyPage')),
+  '/settings': lazy(() => import('../pages/settings/SettingsPage')),
+  '/employees': lazy(() => import('../pages/hr/EmployeesPage')),
+  '/leave': lazy(() => import('../pages/hr/LeavePage')),
+  '/customers': named(() => import('../pages/partners/PartnerPages'), 'CustomersPage'),
+  '/suppliers': named(() => import('../pages/partners/PartnerPages'), 'SuppliersPage'),
+  '/products': lazy(() => import('../pages/inventory/ProductsPage')),
+  '/warehouses': lazy(() => import('../pages/inventory/WarehousesPage')),
+  '/inventory/stock': lazy(() => import('../pages/inventory/StockPage')),
+  '/inventory/movements': lazy(() => import('../pages/inventory/MovementsPage')),
 }
+
+const pageFallback = (
+  <div style={{ padding: 48, textAlign: 'center' }}>
+    <Spin />
+  </div>
+)
 
 export default function AppRoutes() {
   return (
@@ -40,7 +58,9 @@ export default function AppRoutes() {
               path={page.key}
               element={
                 <RequirePermission perms={page.perms}>
-                  {Page ? <Page /> : <ComingSoon title={page.label} />}
+                  <Suspense fallback={pageFallback}>
+                    {Page ? <Page /> : <ComingSoon title={page.label} />}
+                  </Suspense>
                 </RequirePermission>
               }
             />

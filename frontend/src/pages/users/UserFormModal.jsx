@@ -130,7 +130,7 @@ export default function UserFormModal({ open, user, roles, onClose }) {
                   mode="multiple"
                   allowClear
                   placeholder="Choose roles"
-                  optionFilterProp="label"
+                  showSearch={{ optionFilterProp: 'label' }}
                   options={(roles || [])
                     .filter((r) => r.is_active)
                     .map((r) => ({ value: r.id, label: r.display_name }))}
