@@ -97,3 +97,37 @@ export const inventoryApi = {
   adjust: (body) => api.post('/inventory/adjustments', body).then(unwrap),
   transfer: (body) => api.post('/inventory/transfers', body).then(unwrap),
 }
+
+// ---------------------------------------------------------------- sales
+export const quotationsApi = {
+  ...resource('/sales/quotations'),
+  setStatus: (id, status) => api.post(`/sales/quotations/${id}/status`, { status }).then(unwrap),
+  convert: (id, body = {}) => api.post(`/sales/quotations/${id}/convert`, body).then(unwrap),
+  pdfPath: (id) => `/sales/quotations/${id}/pdf`,
+}
+
+export const invoicesApi = {
+  ...resource('/sales/invoices'),
+  approve: (id) => api.post(`/sales/invoices/${id}/approve`).then(unwrap),
+  cancel: (id, reason) => api.post(`/sales/invoices/${id}/cancel`, { reason }).then(unwrap),
+  recordPayment: (id, body) => api.post(`/sales/invoices/${id}/payments`, body).then(unwrap),
+  pdfPath: (id) => `/sales/invoices/${id}/pdf`,
+}
+
+export const paymentsApi = {
+  list: (params = {}) => api.get('/sales/payments', { params: cleanParams(params) }).then(unwrap),
+  void: (id, reason) => api.post(`/sales/payments/${id}/void`, { reason }).then(unwrap),
+}
+
+/** Fetch a file (e.g. a PDF) with the user's token and save it. */
+export async function downloadFile(path, filename) {
+  const response = await api.get(path, { responseType: 'blob' })
+  const url = URL.createObjectURL(response.data)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}

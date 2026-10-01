@@ -77,12 +77,20 @@ class MasterDataService:
                     self.db, self.model, field, values[field], exclude_id=exclude_id, label=label
                 )
 
+    def _next_free_number(self) -> str:
+        """Next automatic code, skipping any that were typed in by hand (e.g. "ITM-00007")."""
+        column = getattr(self.model, self.number_field)  # type: ignore[arg-type]
+        while True:
+            candidate = next_number(self.db, self.number_prefix, yearly=False)  # type: ignore[arg-type]
+            if self.db.scalar(select(self.model.id).where(column == candidate)) is None:
+                return candidate
+
     def create(self, ctx: AuthContext, data: BaseModel) -> Any:
         values = self.defaults(data.model_dump())
         self._check_unique(values, None)
         self.validate(values, None)
         if self.number_field and self.number_prefix and not values.get(self.number_field):
-            values[self.number_field] = next_number(self.db, self.number_prefix, yearly=False)
+            values[self.number_field] = self._next_free_number()
         obj = self.model(**values)
         self.db.add(obj)
         self.db.flush()

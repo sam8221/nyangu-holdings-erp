@@ -65,6 +65,9 @@ class InvoiceCreate(BaseModel):
     invoice_date: date | None = Field(default=None, description="Defaults to today")
     due_date: date | None = Field(default=None, description="Defaults to the customer's terms")
     customer_reference: str | None = Field(default=None, max_length=100)
+    prices_include_tax: bool | None = Field(
+        default=None, description="Unit prices include VAT. Defaults to the system setting"
+    )
     notes: str | None = Field(default=None, max_length=2000)
     lines: list[InvoiceLineIn] = Field(min_length=1, max_length=200)
 
@@ -85,6 +88,9 @@ class InvoiceUpdate(BaseModel):
     invoice_date: date | None = None
     due_date: date | None = None
     customer_reference: str | None = Field(default=None, max_length=100)
+    prices_include_tax: bool | None = Field(
+        default=None, description="Unit prices include VAT. Defaults to the system setting"
+    )
     notes: str | None = Field(default=None, max_length=2000)
     lines: list[InvoiceLineIn] | None = Field(default=None, min_length=1, max_length=200)
 
@@ -144,6 +150,7 @@ class _InvoiceBase(BaseModel):
     due_date: date
     status: str
     currency: str
+    prices_include_tax: bool
     customer_reference: str | None
     subtotal: Decimal
     discount_total: Decimal
@@ -186,3 +193,102 @@ class PaymentCreate(BaseModel):
     method: PaymentMethod
     reference: str | None = Field(default=None, max_length=100, examples=["MTN-8XK2PQ"])
     notes: str | None = Field(default=None, max_length=1000)
+
+
+# ---------------------------------------------------------------------- quotations
+QuotationStatusLiteral = Literal["DRAFT", "SENT", "ACCEPTED", "DECLINED", "CONVERTED"]
+
+
+def _check_validity(quote_date: date | None, valid_until: date | None) -> None:
+    if quote_date and valid_until and valid_until < quote_date:
+        raise ValueError("valid_until cannot be before quote_date")
+
+
+class QuotationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: uuid.UUID
+    branch_id: uuid.UUID | None = None
+    quote_date: date | None = Field(default=None, description="Defaults to today")
+    valid_until: date | None = Field(
+        default=None, description="Defaults to quote_date + the quotation validity setting"
+    )
+    customer_reference: str | None = Field(default=None, max_length=100)
+    prices_include_tax: bool | None = Field(
+        default=None, description="Unit prices include VAT. Defaults to the system setting"
+    )
+    notes: str | None = Field(default=None, max_length=2000)
+    lines: list[InvoiceLineIn] = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def _dates(self) -> QuotationCreate:
+        _check_validity(self.quote_date, self.valid_until)
+        return self
+
+
+class QuotationUpdate(BaseModel):
+    """Drafts and sent quotations. ``lines``, when sent, replaces every line."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: uuid.UUID | None = None
+    branch_id: uuid.UUID | None = None
+    quote_date: date | None = None
+    valid_until: date | None = None
+    customer_reference: str | None = Field(default=None, max_length=100)
+    prices_include_tax: bool | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+    lines: list[InvoiceLineIn] | None = Field(default=None, min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def _dates(self) -> QuotationUpdate:
+        _check_validity(self.quote_date, self.valid_until)
+        return self
+
+
+class _QuotationBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    quote_number: str
+    customer: PartyRef
+    branch_id: uuid.UUID | None
+    quote_date: date
+    valid_until: date
+    status: str
+    is_expired: bool
+    currency: str
+    prices_include_tax: bool
+    customer_reference: str | None
+    subtotal: Decimal
+    discount_total: Decimal
+    tax_total: Decimal
+    total: Decimal
+    invoice_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class QuotationSummary(_QuotationBase):
+    """List view: no lines."""
+
+
+class QuotationOut(_QuotationBase):
+    notes: str | None
+    created_by_id: uuid.UUID | None
+    lines: list[InvoiceLineOut]
+
+
+class QuotationStatusChange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["SENT", "ACCEPTED", "DECLINED"]
+
+
+class ConvertQuotation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    warehouse_id: uuid.UUID | None = Field(
+        default=None, description="Warehouse the goods will be issued from"
+    )
+    invoice_date: date | None = Field(default=None, description="Defaults to today")

@@ -1,4 +1,4 @@
-"""Sales invoices, their lines and customer payments (receipts)."""
+"""Quotations, sales invoices, their lines and customer payments (receipts)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -68,6 +69,10 @@ class SalesInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         String(20), nullable=False, default=InvoiceStatus.DRAFT, index=True
     )
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="ZMW")
+    # True: unit prices already include VAT and VAT is extracted from the totals.
+    prices_include_tax: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     customer_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -193,3 +198,95 @@ class CustomerPayment(UUIDPrimaryKeyMixin, Base):
     @property
     def invoice_number(self) -> str | None:
         return self.invoice.invoice_number if self.invoice else None
+
+
+class QuotationStatus:
+    DRAFT = "DRAFT"
+    SENT = "SENT"
+    ACCEPTED = "ACCEPTED"
+    DECLINED = "DECLINED"
+    CONVERTED = "CONVERTED"  # turned into a sales invoice
+    ALL = (DRAFT, SENT, ACCEPTED, DECLINED, CONVERTED)
+    EDITABLE = (DRAFT, SENT)
+
+
+class Quotation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "quotations"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('DRAFT', 'SENT', 'ACCEPTED', 'DECLINED', 'CONVERTED')",
+            name="status_valid",
+        ),
+        CheckConstraint("valid_until >= quote_date", name="valid_after_quote"),
+        Index("ix_quotations_customer_status", "customer_id", "status"),
+    )
+
+    quote_number: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    customer_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False
+    )
+    branch_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("branches.id", ondelete="RESTRICT"), nullable=True
+    )
+    quote_date: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    valid_until: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), index=True, nullable=False, default=QuotationStatus.DRAFT
+    )
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="ZMW")
+    prices_include_tax: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    customer_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    discount_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    tax_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+
+    invoice_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("sales_invoices.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    customer: Mapped[Customer] = relationship(lazy="joined")
+    lines: Mapped[list[QuotationLine]] = relationship(
+        back_populates="quotation",
+        cascade="all, delete-orphan",
+        order_by="QuotationLine.line_no",
+        lazy="selectin",
+    )
+
+    @property
+    def is_expired(self) -> bool:
+        return self.status in QuotationStatus.EDITABLE and self.valid_until < local_today()
+
+
+class QuotationLine(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "quotation_lines"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="quantity_positive"),
+        CheckConstraint("unit_price >= 0", name="price_non_negative"),
+        CheckConstraint("discount_percent >= 0 AND discount_percent <= 100", name="discount_valid"),
+    )
+
+    quotation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("quotations.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    line_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("products.id", ondelete="RESTRICT"), index=True, nullable=False
+    )
+    description: Mapped[str] = mapped_column(String(300), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    discount_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=0)
+    tax_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=0)
+    discount_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    line_subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    line_tax: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    line_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+
+    quotation: Mapped[Quotation] = relationship(back_populates="lines")
+    product: Mapped[Product] = relationship(lazy="joined")

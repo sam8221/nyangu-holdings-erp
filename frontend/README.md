@@ -47,6 +47,13 @@ there is no CORS setup to do. To point at another backend, set `VITE_PROXY_TARGE
   warehouse.
 - **Inventory:** warehouses, stock levels, low-stock list, adjustments (signed change or physical
   count), transfers between warehouses, and the movement ledger.
+- **Sales:** quotations (numbered automatically, sent/accepted/declined, PDF in the company
+  layout with the logo, convert to invoice), invoices (draft, approve and issue, cancel, PDF,
+  record payments, details with payment history) and the payments list with voiding. One shared
+  form handles both documents: picking a product fills in its price and VAT rate, and totals
+  update as you type, with or without VAT included in the prices.
+- **Automatic numbers:** quotations, customers, suppliers and (when left blank) product item
+  codes are numbered by the server; invoices are numbered when issued.
 
 Menu entries for the other modules open a "coming next" page until their screens are built.
 Their APIs already work (see `/docs`).

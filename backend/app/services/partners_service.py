@@ -96,6 +96,8 @@ class ProductService(MasterDataService):
     label = "Product"
     entity_type = "product"
     action_prefix = "products"
+    number_field = "sku"  # item codes are numbered automatically when left blank
+    number_prefix = "ITM"
     unique_fields = {"sku": "SKU", "barcode": "barcode"}
     required_fields = (
         "sku",

@@ -81,7 +81,7 @@ class _EmployeeFields(BaseModel):
         default=None, max_length=30, description="NRC, e.g. 123456/10/1", examples=["123456/10/1"]
     )
     napsa_number: str | None = Field(default=None, max_length=30)
-    tpin: str | None = Field(default=None, pattern=r"^\d{10}$")
+    tpin: str | None = Field(default=None, pattern=r"^\d{10,11}$")
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=30)
     address: str | None = Field(default=None, max_length=1000)

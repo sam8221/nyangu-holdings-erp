@@ -22,10 +22,10 @@ def _lower_email(v: str | None) -> str | None:
 
 
 def _sku(v: str | None) -> str | None:
-    if v is None:
-        return None
+    if v is None or not v.strip():
+        return None  # blank: numbered automatically on create
     v = v.strip().upper()
-    if not v or len(v) > 40 or not all(c.isalnum() or c in "-_./" for c in v):
+    if len(v) > 40 or not all(c.isalnum() or c in "-_./" for c in v):
         raise ValueError("SKU must be 1-40 characters: letters, digits, '-', '_', '.' or '/'")
     return v
 
@@ -53,7 +53,9 @@ class _PartyOut(BaseModel):
 class _PartyFields(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    tpin: str | None = Field(default=None, pattern=r"^\d{10}$", description="10-digit ZRA TPIN")
+    tpin: str | None = Field(
+        default=None, pattern=r"^\d{10,11}$", description="ZRA TPIN (10 or 11 digits)"
+    )
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=30)
     address: str | None = Field(default=None, max_length=1000)
@@ -196,7 +198,12 @@ class _ProductFields(BaseModel):
 
 
 class ProductCreate(_ProductFields):
-    sku: str = Field(min_length=1, max_length=40, examples=["CEM-50KG"])
+    sku: str | None = Field(
+        default=None,
+        max_length=40,
+        examples=["CEM-50KG"],
+        description="Item code. Leave empty to number automatically (ITM-00001, ITM-00002...)",
+    )
     name: str = Field(min_length=2, max_length=200, examples=["Cement 50kg bag"])
     product_type: ProductType = "GOODS"
     unit: str = Field(default="pcs", min_length=1, max_length=20)

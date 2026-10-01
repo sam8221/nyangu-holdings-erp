@@ -83,6 +83,8 @@ class Settings(BaseSettings):
 
     # --- Localisation ---
     DEFAULT_CURRENCY: str = "ZMW"
+    # Logo printed on quotations and invoices; defaults to app/assets/logo.jpg.
+    COMPANY_LOGO_PATH: str | None = None
     TIMEZONE: str = "Africa/Lusaka"
 
     # --- Seeding (development only) ---

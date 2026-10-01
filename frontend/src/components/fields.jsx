@@ -24,7 +24,7 @@ export function ActiveFilter({ value, onChange }) {
 }
 
 /** Validation rule for Zambian TPINs (10 digits). */
-export const tpinRule = { pattern: /^\d{10}$/, message: 'A TPIN has exactly 10 digits' }
+export const tpinRule = { pattern: /^\d{10,11}$/, message: 'A TPIN has 10 or 11 digits' }
 
 /** Normaliser for upper-case codes typed into inputs. */
 export const upper = (value) => (value || '').toUpperCase()

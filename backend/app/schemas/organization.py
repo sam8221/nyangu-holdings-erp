@@ -37,7 +37,9 @@ class CompanyUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=150)
     legal_name: str | None = Field(default=None, max_length=200)
     registration_number: str | None = Field(default=None, max_length=50)
-    tpin: str | None = Field(default=None, pattern=r"^\d{10}$", description="10-digit ZRA TPIN")
+    tpin: str | None = Field(
+        default=None, pattern=r"^\d{10,11}$", description="ZRA TPIN (10 or 11 digits)"
+    )
     vat_number: str | None = Field(default=None, max_length=30)
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=30)
@@ -146,6 +148,10 @@ class SettingsOut(BaseModel):
     annual_leave_days: int = Field(description="Annual leave entitlement per calendar year")
     low_stock_alerts_enabled: bool
     invoice_footer: str
+    prices_include_tax: bool = Field(
+        description="Prices on new quotations and invoices include VAT"
+    )
+    quotation_validity_days: int
 
 
 class SettingsUpdate(BaseModel):
@@ -156,3 +162,5 @@ class SettingsUpdate(BaseModel):
     annual_leave_days: int | None = Field(default=None, ge=0, le=366)
     low_stock_alerts_enabled: bool | None = None
     invoice_footer: str | None = Field(default=None, max_length=500)
+    prices_include_tax: bool | None = None
+    quotation_validity_days: int | None = Field(default=None, ge=1, le=365)

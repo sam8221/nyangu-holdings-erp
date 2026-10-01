@@ -1,4 +1,5 @@
 import { Card, Typography } from 'antd'
+import logo from '../../assets/logo.jpg'
 import { colors } from '../../theme'
 
 /** Centred card on a white-to-light-blue background, shared by the sign-in pages. */
@@ -15,22 +16,11 @@ export default function AuthShell({ title, subtitle, children }) {
     >
       <div style={{ width: '100%', maxWidth: 400 }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div
-            style={{
-              width: 52,
-              height: 52,
-              margin: '0 auto 12px',
-              borderRadius: 12,
-              background: colors.primary,
-              color: colors.white,
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 24,
-              fontWeight: 700,
-            }}
-          >
-            N
-          </div>
+          <img
+            src={logo}
+            alt="Nyangu Holdings - Turning Vision Into Value"
+            style={{ width: 150, height: 150, objectFit: 'contain', display: 'block', margin: '0 auto 4px', mixBlendMode: 'multiply' }}
+          />
           <Typography.Title level={3} style={{ margin: 0, color: colors.primaryDark }}>
             Nyangu Holdings ERP
           </Typography.Title>

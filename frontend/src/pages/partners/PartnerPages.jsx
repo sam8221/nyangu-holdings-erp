@@ -44,15 +44,13 @@ function ContactFields() {
   )
 }
 
-function Name({ record }) {
+function Name({ record, prefix }) {
   return (
     <Row gutter={16}>
       <Col span={24}>
-        {record && (
-          <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-            Code {record.code}
-          </Typography.Text>
-        )}
+        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+          {record ? `Code ${record.code}` : `The code is given automatically (${prefix}-00001, ${prefix}-00002...).`}
+        </Typography.Text>
         <Form.Item name="name" label="Name" rules={[{ required: true, min: 2 }]}>
           <Input autoFocus />
         </Form.Item>
@@ -80,7 +78,7 @@ function StatusAndNotes({ editing }) {
 function CustomerFields({ record, editing }) {
   return (
     <>
-      <Name record={record} />
+      <Name record={record} prefix="CUS" />
       <Row gutter={16}>
         <Col xs={24} sm={8}>
           <Form.Item name="customer_type" label="Type" rules={[{ required: true }]}>
@@ -206,7 +204,7 @@ export function CustomersPage() {
 function SupplierFields({ record, editing }) {
   return (
     <>
-      <Name record={record} />
+      <Name record={record} prefix="SUP" />
       <Row gutter={16}>
         <Col xs={24} sm={8}>
           <Form.Item name="payment_terms_days" label="Payment terms (days)" extra="Empty = default">

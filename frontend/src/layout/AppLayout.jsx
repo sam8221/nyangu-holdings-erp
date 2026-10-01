@@ -9,6 +9,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../auth/AuthContext'
+import logo from '../assets/logo.jpg'
 import { colors } from '../theme'
 import ChangePasswordModal from './ChangePasswordModal'
 import NotificationBell from './NotificationBell'
@@ -85,20 +86,7 @@ export default function AppLayout() {
             borderBottom: `1px solid ${colors.lightBlue}`,
           }}
         >
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 8,
-              background: colors.primary,
-              color: colors.white,
-              display: 'grid',
-              placeItems: 'center',
-              fontWeight: 700,
-            }}
-          >
-            N
-          </div>
+          <img src={logo} alt="Nyangu Holdings" style={{ width: 44, height: 44, objectFit: 'contain' }} />
           {!collapsed && (
             <div style={{ lineHeight: 1.15 }}>
               <div style={{ fontWeight: 700, color: colors.primaryDark }}>Nyangu Holdings</div>

@@ -69,6 +69,7 @@ def issued_invoice(client, admin, setup: dict, quantity: str = "10") -> dict:
         {
             "customer_id": setup["customer"]["id"],
             "warehouse_id": setup["warehouse"]["id"],
+            "prices_include_tax": False,
             "lines": [{"product_id": setup["goods"]["id"], "quantity": quantity}],
         },
         admin,

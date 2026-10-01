@@ -16,8 +16,9 @@ and every endpoint is browsable in Swagger at `/docs` once the API is running.
 
 The frontend (React + Ant Design, white and light-blue theme) has its foundation in place:
 sign-in and password flows, the permission-aware layout, the dashboard, users and roles, company
-setup, HR, customers, suppliers, products and inventory. See
-[frontend/README.md](frontend/README.md). Sales, procurement, finance, assets and reports are next.
+setup, HR, customers, suppliers, products, inventory and sales (quotations in the company's
+own layout with the logo, invoices and payments). See [frontend/README.md](frontend/README.md).
+Procurement, finance, assets and reports are next.
 
 ## Development order
 | # | Area | Backend | Frontend |
@@ -30,7 +31,7 @@ setup, HR, customers, suppliers, products and inventory. See
 | 6 | Employees | Done | Done (employees and leave) |
 | 7 | Customers and suppliers | Done | Done |
 | 8 | Products and inventory | Done | Done |
-| 9 | Sales | Done | To do |
+| 9 | Sales | Done (incl. quotations) | Done (quotations, invoices, payments) |
 | 10 | Procurement | Done | To do |
 | 11 | Finance | Done | To do |
 | 12 | Assets | Done | To do |

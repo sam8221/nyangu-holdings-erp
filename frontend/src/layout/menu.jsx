@@ -22,6 +22,7 @@ export const MENU = [
     label: 'Sales',
     icon: <ShoppingCartOutlined />,
     children: [
+      { key: '/sales/quotations', label: 'Quotations', perms: ['sales.view'] },
       { key: '/sales/invoices', label: 'Invoices', perms: ['sales.view'] },
       { key: '/sales/payments', label: 'Payments', perms: ['sales.view', 'finance.view'] },
       { key: '/customers', label: 'Customers', perms: ['customers.view'] },

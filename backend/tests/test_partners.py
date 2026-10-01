@@ -187,3 +187,30 @@ def test_inactive_category_cannot_be_used(client, auth_headers) -> None:
         headers=store,
     )
     assert r.status_code == 422
+
+
+def test_item_codes_are_numbered_automatically(client, auth_headers) -> None:
+    store = auth_headers("STOREKEEPER")
+    first = client.post(f"{API}/products", json={"name": "iPhone 15"}, headers=store)
+    assert first.status_code == 201, first.text
+    assert first.json()["data"]["sku"] == "ITM-00001"
+    blank = client.post(f"{API}/products", json={"sku": "  ", "name": "iPhone 16"}, headers=store)
+    assert blank.json()["data"]["sku"] == "ITM-00002"
+
+    # A typed code is kept, and the counter skips codes that were typed by hand.
+    typed = client.post(
+        f"{API}/products", json={"sku": "chint", "name": "Contactor"}, headers=store
+    )
+    assert typed.json()["data"]["sku"] == "CHINT"
+    client.post(
+        f"{API}/products", json={"sku": "ITM-00003", "name": "Typed by hand"}, headers=store
+    )
+    nxt = client.post(f"{API}/products", json={"name": "Next automatic"}, headers=store)
+    assert nxt.json()["data"]["sku"] == "ITM-00004"
+
+    # The code can still be changed later, but not emptied.
+    pid = first.json()["data"]["id"]
+    renamed = client.put(f"{API}/products/{pid}", json={"sku": "IPH-15"}, headers=store)
+    assert renamed.json()["data"]["sku"] == "IPH-15"
+    emptied = client.put(f"{API}/products/{pid}", json={"sku": ""}, headers=store)
+    assert emptied.status_code == 422

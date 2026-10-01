@@ -28,6 +28,9 @@ const BUILT = {
   '/warehouses': lazy(() => import('../pages/inventory/WarehousesPage')),
   '/inventory/stock': lazy(() => import('../pages/inventory/StockPage')),
   '/inventory/movements': lazy(() => import('../pages/inventory/MovementsPage')),
+  '/sales/quotations': lazy(() => import('../pages/sales/QuotationsPage')),
+  '/sales/invoices': lazy(() => import('../pages/sales/InvoicesPage')),
+  '/sales/payments': lazy(() => import('../pages/sales/PaymentsPage')),
 }
 
 const pageFallback = (

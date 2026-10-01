@@ -30,14 +30,15 @@ function ProductFields({ record, editing }) {
         <Col xs={24} sm={8}>
           <Form.Item
             name="sku"
-            label="SKU"
+            label="Item code"
             normalize={upper}
+            extra={editing ? null : 'Leave blank to number automatically (ITM-00001...)'}
             rules={[
-              { required: true, message: 'Enter a SKU' },
+              ...(editing ? [{ required: true, message: 'Enter an item code' }] : []),
               { pattern: /^[A-Z0-9\-_./]{1,40}$/, message: 'Letters, digits, - _ . or /' },
             ]}
           >
-            <Input placeholder="CEM-50KG" />
+            <Input placeholder={editing ? 'CEM-50KG' : 'Automatic'} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={16}>
@@ -138,7 +139,7 @@ const productFormValues = (p) => ({
 const decimal = (v) => (v === null || v === undefined || v === '' ? null : String(v))
 
 const productPayload = (values, record) => {
-  const body = emptyToNull(values, ['description', 'barcode', 'category_id'])
+  const body = emptyToNull(values, ['sku', 'description', 'barcode', 'category_id'])
   body.selling_price = decimal(values.selling_price)
   body.tax_rate = decimal(values.tax_rate)
   body.reorder_level = decimal(values.reorder_level)
@@ -208,7 +209,7 @@ function Products() {
             : []
         }
         columns={[
-          { title: 'SKU', dataIndex: 'sku', key: 'sku', sortField: 'sku' },
+          { title: 'Item code', dataIndex: 'sku', key: 'sku', sortField: 'sku' },
           { title: 'Name', dataIndex: 'name', key: 'name', sortField: 'name' },
           {
             title: 'Type',

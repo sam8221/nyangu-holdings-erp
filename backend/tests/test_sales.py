@@ -34,6 +34,7 @@ def test_draft_invoice_totals_and_defaults(client, auth_headers) -> None:
         "/sales/invoices",
         {
             "customer_id": s["customer"]["id"],
+            "prices_include_tax": False,
             "warehouse_id": s["warehouse"]["id"],
             "customer_reference": "PO-778",
             "lines": [
@@ -88,6 +89,7 @@ def test_sales_officer_cannot_approve(client, auth_headers) -> None:
         "/sales/invoices",
         {
             "customer_id": s["customer"]["id"],
+            "prices_include_tax": False,
             "warehouse_id": s["warehouse"]["id"],
             "lines": [{"product_id": s["goods"]["id"], "quantity": "1"}],
         },
@@ -110,6 +112,7 @@ def test_issue_fails_without_stock_or_warehouse(client, auth_headers) -> None:
         "/sales/invoices",
         {
             "customer_id": s["customer"]["id"],
+            "prices_include_tax": False,
             "warehouse_id": s["warehouse"]["id"],
             "lines": [{"product_id": s["goods"]["id"], "quantity": "6"}],
         },
@@ -125,6 +128,7 @@ def test_issue_fails_without_stock_or_warehouse(client, auth_headers) -> None:
         "/sales/invoices",
         {
             "customer_id": s["customer"]["id"],
+            "prices_include_tax": False,
             "lines": [{"product_id": s["goods"]["id"], "quantity": "1"}],
         },
         admin,
@@ -138,6 +142,7 @@ def test_issue_fails_without_stock_or_warehouse(client, auth_headers) -> None:
         "/sales/invoices",
         {
             "customer_id": s["customer"]["id"],
+            "prices_include_tax": False,
             "lines": [{"product_id": s["service"]["id"], "quantity": "2"}],
         },
         admin,
@@ -159,6 +164,7 @@ def test_credit_limit_is_enforced(client, auth_headers) -> None:
         "/sales/invoices",
         {
             "customer_id": s["customer"]["id"],
+            "prices_include_tax": False,
             "warehouse_id": s["warehouse"]["id"],
             "lines": [{"product_id": s["goods"]["id"], "quantity": "5"}],
         },
@@ -271,6 +277,7 @@ def test_invoice_filters_and_overdue(client, auth_headers) -> None:
         "/sales/invoices",
         {
             "customer_id": s["customer"]["id"],
+            "prices_include_tax": False,
             "warehouse_id": s["warehouse"]["id"],
             "invoice_date": (local_today() - timedelta(days=60)).isoformat(),
             "due_date": (local_today() - timedelta(days=30)).isoformat(),
@@ -292,6 +299,7 @@ def test_invoice_filters_and_overdue(client, auth_headers) -> None:
         f"{API}/sales/invoices",
         json={
             "customer_id": s["customer"]["id"],
+            "prices_include_tax": False,
             "invoice_date": "2026-05-10",
             "due_date": "2026-05-01",
             "lines": [{"product_id": s["goods"]["id"], "quantity": "1"}],
@@ -309,6 +317,7 @@ def test_update_and_delete_draft(client, auth_headers) -> None:
         "/sales/invoices",
         {
             "customer_id": s["customer"]["id"],
+            "prices_include_tax": False,
             "lines": [{"product_id": s["goods"]["id"], "quantity": "1"}],
         },
         admin,

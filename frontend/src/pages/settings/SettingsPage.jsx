@@ -79,6 +79,25 @@ export default function SettingsPage() {
                   <Switch />
                 </Form.Item>
               </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="prices_include_tax"
+                  label="Prices include VAT"
+                  valuePropName="checked"
+                  extra="New quotations and invoices treat unit prices as VAT-inclusive (can be changed per document)."
+                >
+                  <Switch />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="quotation_validity_days"
+                  label="Quotations valid for (days)"
+                  rules={[{ required: true }]}
+                >
+                  <InputNumber min={1} max={365} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
               <Col span={24}>
                 <Form.Item name="invoice_footer" label="Invoice footer" extra="Printed at the bottom of invoices.">
                   <Input.TextArea rows={2} maxLength={500} showCount />

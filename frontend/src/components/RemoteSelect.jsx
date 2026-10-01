@@ -37,7 +37,8 @@ export default function RemoteSelect({
     for (const item of [].concat(selected || [])) {
       if (item?.id && !byId.has(item.id)) byId.set(item.id, item)
     }
-    return [...byId.values()].map((item) => ({ value: item.id, label: labelOf(item) }))
+    // `item` lets onChange(value, option) read the whole record (e.g. a product's price).
+    return [...byId.values()].map((item) => ({ value: item.id, label: labelOf(item), item }))
   }, [query.data, selected, labelOf])
 
   const onSearch = (value) => {

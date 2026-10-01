@@ -19,6 +19,9 @@ DEFAULTS: dict[str, Any] = {
     "annual_leave_days": 24,  # 2 days per month, the Zambian statutory minimum
     "low_stock_alerts_enabled": True,
     "invoice_footer": "Thank you for your business.",
+    # Unit prices on quotations and invoices include VAT unless a document says otherwise.
+    "prices_include_tax": True,
+    "quotation_validity_days": 30,
 }
 _DECIMAL_KEYS = {"default_vat_rate"}
 

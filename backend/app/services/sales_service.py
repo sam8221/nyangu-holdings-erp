@@ -29,10 +29,77 @@ from app.services.audit import AuditService
 from app.services.base import require_active, require_exists
 from app.services.inventory_service import InventoryService
 from app.services.pricing import document_totals, line_amounts
+from app.services.settings_service import SettingsService
 from app.utils.exceptions import BusinessRuleError
 from app.utils.money import ZERO, money
 from app.utils.sequences import next_number
 from app.utils.time import local_today, utcnow
+
+
+def build_document_lines(
+    db: Session,
+    document: Any,
+    lines: list[InvoiceLineIn],
+    line_model: type,
+) -> None:
+    """Replace a quotation's or invoice's lines and recompute its totals.
+
+    Prices and VAT rates default from the product. ``document.prices_include_tax`` decides
+    whether unit prices already contain VAT.
+    """
+    document.lines.clear()
+    db.flush()
+    inclusive = bool(document.prices_include_tax)
+    amounts = []
+    for number, line in enumerate(lines, start=1):
+        field = f"lines.{number - 1}.product_id"
+        product = require_exists(db, Product, line.product_id, field)
+        require_active(product, field)
+        unit_price = line.unit_price if line.unit_price is not None else product.selling_price
+        tax_rate = line.tax_rate if line.tax_rate is not None else product.tax_rate
+        calc = line_amounts(
+            line.quantity, unit_price, line.discount_percent, tax_rate, inclusive=inclusive
+        )
+        amounts.append(calc)
+        document.lines.append(
+            line_model(
+                line_no=number,
+                product_id=product.id,
+                description=line.description or product.name,
+                quantity=line.quantity,
+                unit_price=money(unit_price),
+                discount_percent=line.discount_percent,
+                tax_rate=tax_rate,
+                discount_amount=calc.discount_amount,
+                line_subtotal=calc.subtotal,
+                line_tax=calc.tax,
+                line_total=calc.total,
+            )
+        )
+    totals = document_totals(amounts, inclusive=inclusive)
+    document.subtotal = totals.subtotal
+    document.discount_total = totals.discount_total
+    document.tax_total = totals.tax_total
+    document.total = totals.total
+
+
+def lines_as_input(document: Any) -> list[InvoiceLineIn]:
+    """A document's current lines, in the shape used to (re)build lines."""
+    return [
+        InvoiceLineIn(
+            product_id=ln.product_id,
+            quantity=ln.quantity,
+            unit_price=ln.unit_price,
+            discount_percent=ln.discount_percent,
+            tax_rate=ln.tax_rate,
+            description=ln.description,
+        )
+        for ln in document.lines
+    ]
+
+
+def default_prices_include_tax(db: Session) -> bool:
+    return bool(SettingsService(db).get("prices_include_tax"))
 
 
 def recalculate_payment_status(invoice: SalesInvoice) -> None:
@@ -129,44 +196,15 @@ class SalesService:
             )
 
     def _build_lines(self, invoice: SalesInvoice, lines: list[InvoiceLineIn]) -> None:
-        invoice.lines.clear()
-        self.db.flush()
-        amounts = []
-        for number, line in enumerate(lines, start=1):
-            product = require_exists(
-                self.db, Product, line.product_id, f"lines.{number - 1}.product_id"
-            )
-            require_active(product, f"lines.{number - 1}.product_id")
-            unit_price = line.unit_price if line.unit_price is not None else product.selling_price
-            tax_rate = line.tax_rate if line.tax_rate is not None else product.tax_rate
-            calc = line_amounts(line.quantity, unit_price, line.discount_percent, tax_rate)
-            amounts.append(calc)
-            invoice.lines.append(
-                SalesInvoiceLine(
-                    line_no=number,
-                    product_id=product.id,
-                    description=line.description or product.name,
-                    quantity=line.quantity,
-                    unit_price=money(unit_price),
-                    discount_percent=line.discount_percent,
-                    tax_rate=tax_rate,
-                    discount_amount=calc.discount_amount,
-                    line_subtotal=calc.subtotal,
-                    line_tax=calc.tax,
-                    line_total=calc.total,
-                )
-            )
-        totals = document_totals(amounts)
-        invoice.subtotal = totals.subtotal
-        invoice.discount_total = totals.discount_total
-        invoice.tax_total = totals.tax_total
-        invoice.total = totals.total
+        build_document_lines(self.db, invoice, lines, SalesInvoiceLine)
 
     def create_invoice(self, ctx: AuthContext, data: InvoiceCreate) -> SalesInvoice:
         customer = self._customer(data.customer_id)
         values = data.model_dump(exclude={"lines"})
         self._check_refs(values)
         invoice_date = data.invoice_date or local_today()
+        if values.get("prices_include_tax") is None:
+            values["prices_include_tax"] = default_prices_include_tax(self.db)
         invoice = SalesInvoice(
             **{**values, "invoice_date": invoice_date},
             status=InvoiceStatus.DRAFT,
@@ -204,15 +242,21 @@ class SalesService:
         if changes.get("customer_id"):
             self._customer(changes["customer_id"])
         self._check_refs(changes)
-        for field in ("customer_id", "invoice_date", "due_date"):
+        for field in ("customer_id", "invoice_date", "due_date", "prices_include_tax"):
             if field in changes and changes[field] is None:
                 raise BusinessRuleError(f"{field} cannot be null")
+        pricing_changed = (
+            "prices_include_tax" in changes
+            and changes["prices_include_tax"] != invoice.prices_include_tax
+        )
         for key, value in changes.items():
             setattr(invoice, key, value)
         if invoice.due_date < invoice.invoice_date:
             raise BusinessRuleError("due_date cannot be before invoice_date")
         if data.lines is not None:
             self._build_lines(invoice, data.lines)
+        elif pricing_changed:
+            self._build_lines(invoice, lines_as_input(invoice))
         self.audit.log(
             "sales.invoice_update",
             actor=ctx.user,
